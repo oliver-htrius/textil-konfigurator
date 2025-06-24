@@ -1,227 +1,134 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Textil-Konfigurator</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 20px;
-    }
-    #controls {
-      margin-bottom: 10px;
-    }
-    #canvasWrapper {
-      width: 1200px;
-      height: 2000px;
-      margin: 0 auto;
-      border: 1px dashed #ccc;
-      background: transparent;
-      position: relative;
-    }
-    svg {
-      width: 100%;
-      height: 100%;
-    }
-    .handle {
-      cursor: pointer;
-    }
-    .toolbar {
-      margin-top: 10px;
-    }
+    body { text-align: center; font-family: sans-serif; margin: 20px; }
+    #canvasWrapper { width: 336px; height: 560px; margin: auto; border: 1px dashed #ccc; position: relative; }
+    svg { width: 100%; height: 100%; }
+    .handle { cursor: pointer; user-select: none; }
+    .edit-text { fill: white; font-size: 20px; }
   </style>
 </head>
 <body>
-
-<h2>Textil-Konfigurator (12 × 20 cm)</h2>
-<div id="controls">
+  <h2>Textil-Konfigurator (336 × 560 px)</h2>
   <input type="file" id="svgInput" accept=".svg">
-  <button onclick="addText()">Text hinzufügen</button>
-  <button onclick="downloadSVG()">Als SVG speichern</button><br><br>
-  <label for="fontSelect">Schriftart:</label>
-  <select id="fontSelect">
-    <option value="Arial">Arial</option>
-    <option value="Verdana">Verdana</option>
-    <option value="Courier New">Courier New</option>
-    <option value="Georgia">Georgia</option>
+  <button onclick="addText()">Text</button>
+  <button onclick="download()">SVG speichern</button><br><br>
+  <label>Schriftart:</label>
+  <select id="font">
+    <option>Arial</option><option>Verdana</option><option>Courier New</option><option>Georgia</option>
   </select>
-  <label for="colorPicker">Farbe:</label>
-  <input type="color" id="colorPicker" value="#ffffff">
-</div>
+  <label>Farbe:</label>
+  <input type="color" id="color" value="#ffffff"><br><br>
 
-<div id="canvasWrapper">
-  <svg id="designArea" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 2000"></svg>
-</div>
+  <div id="canvasWrapper">
+    <svg id="svg" viewBox="0 0 336 560" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
 
-<script>
-  const svg = document.getElementById("designArea");
+  <script>
+    const svg = document.getElementById("svg");
 
-  document.getElementById("svgInput").addEventListener("change", function(e) {
-    const file = e.target.files[0];
-    if (!file || !file.name.endsWith(".svg")) return;
+    function createGroup() {
+      const g = document.createElementNS(svg.namespaceURI, "g");
+      g.setAttribute("transform", "translate(100,100) rotate(0) scale(1)");
 
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-      const group = createMovableGroup();
-      const parser = new DOMParser();
-      const svgContent = parser.parseFromString(evt.target.result, "image/svg+xml").documentElement;
+      const move = document.createElementNS(svg.namespaceURI, "circle");
+      move.setAttribute("r", 6); move.setAttribute("fill", "black");
+      move.setAttribute("cx", 0); move.setAttribute("cy", 0); move.classList.add("handle");
+      g.appendChild(move);
 
-      const contentGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      for (let child of svgContent.children) {
-        contentGroup.appendChild(child.cloneNode(true));
-      }
-      group.insertBefore(contentGroup, group.firstChild);
-      svg.appendChild(group);
-    };
-    reader.readAsText(file);
-  });
+      const rot = document.createElementNS(svg.namespaceURI, "text");
+      rot.textContent = "⟳"; rot.setAttribute("x", 40); rot.setAttribute("y", -10);
+      rot.setAttribute("font-size", "16"); rot.setAttribute("fill", "red");
+      rot.classList.add("handle"); g.appendChild(rot);
 
-  function addText() {
-    const group = createMovableGroup();
+      const scale = document.createElementNS(svg.namespaceURI, "text");
+      scale.textContent = "⤢"; scale.setAttribute("x", 40); scale.setAttribute("y", 40);
+      scale.setAttribute("font-size", "16"); scale.setAttribute("fill", "green");
+      scale.classList.add("handle"); g.appendChild(scale);
 
-    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    text.textContent = "Dein Text";
-    text.setAttribute("x", "0");
-    text.setAttribute("y", "0");
-    text.setAttribute("font-size", "32");
-    text.setAttribute("fill", "#ffffff");
-    text.setAttribute("font-family", document.getElementById("fontSelect").value);
-    text.classList.add("draggable");
+      const del = document.createElementNS(svg.namespaceURI, "text");
+      del.textContent = "🗑️"; del.setAttribute("x", -20); del.setAttribute("y", -10);
+      del.setAttribute("font-size", "16"); del.setAttribute("fill", "gray");
+      del.classList.add("handle"); g.appendChild(del);
 
-    text.addEventListener("dblclick", () => {
-      const newText = prompt("Text eingeben:", text.textContent);
-      if (newText !== null) text.textContent = newText;
-    });
+      del.addEventListener("click", () => g.remove());
+      rot.addEventListener("click", () => update(g, 0, 0, 15, 1));
 
-    group.insertBefore(text, group.firstChild);
-    svg.appendChild(group);
-  }
+      let dragging = false, scaling = false, px = 0, py = 0;
+      move.addEventListener("mousedown", e => { dragging = true; px = e.clientX; py = e.clientY; e.stopPropagation(); });
+      scale.addEventListener("mousedown", e => { scaling = true; py = e.clientY; e.stopPropagation(); });
+      window.addEventListener("mousemove", e => {
+        if (dragging) { update(g, e.clientX - px, e.clientY - py, 0, 1); px = e.clientX; py = e.clientY; }
+        if (scaling) { update(g, 0, 0, 0, 1 + (e.clientY - py) * 0.01); py = e.clientY; }
+      });
+      window.addEventListener("mouseup", () => { dragging = false; scaling = false; });
 
-  function createMovableGroup() {
-    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    group.setAttribute("transform", "translate(300,300) rotate(0) scale(1)");
-
-    // Verschiebegriff (Pfeil-Plus)
-    const moveHandle = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    moveHandle.setAttribute("d", "M0 -10 L0 -30 M0 10 L0 30 M-10 0 L-30 0 M10 0 L30 0 M-7 -7 L7 7 M-7 7 L7 -7");
-    moveHandle.setAttribute("stroke", "black");
-    moveHandle.setAttribute("stroke-width", "2");
-    moveHandle.setAttribute("fill", "none");
-    moveHandle.classList.add("handle");
-
-    // Rotationsgriff
-    const rotateHandle = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    rotateHandle.setAttribute("x", "100");
-    rotateHandle.setAttribute("y", "-30");
-    rotateHandle.setAttribute("font-size", "20");
-    rotateHandle.setAttribute("fill", "red");
-    rotateHandle.textContent = "⟳";
-    rotateHandle.classList.add("handle");
-
-    // Skaliergriff
-    const scaleHandle = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    scaleHandle.setAttribute("x", "100");
-    scaleHandle.setAttribute("y", "100");
-    scaleHandle.setAttribute("font-size", "18");
-    scaleHandle.setAttribute("fill", "green");
-    scaleHandle.textContent = "⤢";
-    scaleHandle.classList.add("handle");
-
-    group.appendChild(moveHandle);
-    group.appendChild(rotateHandle);
-    group.appendChild(scaleHandle);
-
-    addMove(group, moveHandle);
-    addRotate(group, rotateHandle);
-    addScale(group, scaleHandle);
-
-    return group;
-  }
-
-  function addMove(group, handle) {
-    let isDragging = false, startX, startY;
-
-    handle.addEventListener("mousedown", function(evt) {
-      isDragging = true;
-      startX = evt.clientX;
-      startY = evt.clientY;
-      evt.stopPropagation();
-    });
-
-    window.addEventListener("mousemove", function(evt) {
-      if (!isDragging) return;
-      const dx = evt.clientX - startX;
-      const dy = evt.clientY - startY;
-      startX = evt.clientX;
-      startY = evt.clientY;
-      updateTransform(group, dx, dy, 0, 1);
-    });
-
-    window.addEventListener("mouseup", () => isDragging = false);
-  }
-
-  function addRotate(group, handle) {
-    handle.addEventListener("click", () => {
-      updateTransform(group, 0, 0, 15, 1);
-    });
-  }
-
-  function addScale(group, handle) {
-    let scaling = false, startY;
-
-    handle.addEventListener("mousedown", function(evt) {
-      scaling = true;
-      startY = evt.clientY;
-      evt.stopPropagation();
-    });
-
-    window.addEventListener("mousemove", function(evt) {
-      if (!scaling) return;
-      const dy = evt.clientY - startY;
-      const scaleChange = 1 + dy * 0.005;
-      updateTransform(group, 0, 0, 0, scaleChange);
-      startY = evt.clientY;
-    });
-
-    window.addEventListener("mouseup", () => scaling = false);
-  }
-
-  function updateTransform(group, dx, dy, dRotate, dScale) {
-    const match = group.getAttribute("transform").match(/translate\(([^,]+),([^\)]+)\) rotate\(([^\)]+)\) scale\(([^\)]+)\)/);
-    let [x, y, r, s] = match ? match.slice(1).map(Number) : [0, 0, 0, 1];
-    x += dx;
-    y += dy;
-    r = Math.round((r + dRotate) / 15) * 15 % 360;
-    s *= dScale;
-    s = Math.min(Math.max(s, 0.2), 5);
-    group.setAttribute("transform", `translate(${x},${y}) rotate(${r}) scale(${s})`);
-
-    // Bei Text: Schriftart und Farbe aktualisieren
-    const text = group.querySelector("text:not(.handle)");
-    if (text) {
-      text.setAttribute("font-family", document.getElementById("fontSelect").value);
-      text.setAttribute("fill", document.getElementById("colorPicker").value);
+      svg.appendChild(g);
+      return g;
     }
-  }
 
-  function downloadSVG() {
-  const handles = svg.querySelectorAll(".handle");
-  handles.forEach(h => h.style.display = "none"); // temporär ausblenden
+    function update(g, dx, dy, dr, ds) {
+      let [x, y, r, s] = g.getAttribute("transform").match(/[-.\\d]+/g).map(Number);
+      x += dx; y += dy; r = (r + dr) % 360; s = Math.min(Math.max(s * ds, 0.2), 5);
+      g.setAttribute("transform", `translate(${x},${y}) rotate(${r}) scale(${s})`);
+      const t = g.querySelector("foreignObject");
+      if (t) {
+        const div = t.querySelector("div");
+        div.style.color = document.getElementById("color").value;
+        div.style.fontFamily = document.getElementById("font").value;
+      }
+    }
 
-  const serializer = new XMLSerializer();
-  const source = serializer.serializeToString(svg);
-  const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "textil-design.svg";
-  link.click();
-  URL.revokeObjectURL(url);
+    function addText() {
+      const g = createGroup();
+      const foreign = document.createElementNS(svg.namespaceURI, "foreignObject");
+      foreign.setAttribute("x", 0); foreign.setAttribute("y", 0);
+      foreign.setAttribute("width", 200); foreign.setAttribute("height", 50);
 
-  handles.forEach(h => h.style.display = ""); // wieder einblenden
-}
-</script>
+      const div = document.createElement("div");
+      div.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+      div.contentEditable = true;
+      div.innerText = "Dein Text";
+      div.style.fontSize = "20px";
+      div.style.color = document.getElementById("color").value;
+      div.style.fontFamily = document.getElementById("font").value;
+
+      foreign.appendChild(div);
+      g.insertBefore(foreign, g.firstChild);
+    }
+
+    document.getElementById("svgInput").addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file || !file.name.endsWith(".svg")) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const g = createGroup();
+        const parsed = new DOMParser().parseFromString(reader.result, "image/svg+xml");
+        const inner = document.createElementNS(svg.namespaceURI, "g");
+        for (let el of parsed.documentElement.children)
+          inner.appendChild(el.cloneNode(true));
+        g.insertBefore(inner, g.firstChild);
+      };
+      reader.readAsText(file);
+    });
+
+    function download() {
+      const handles = svg.querySelectorAll(".handle");
+      handles.forEach(h => h.style.display = "none");
+      const serializer = new XMLSerializer();
+      const source = serializer.serializeToString(svg);
+      const blob = new Blob([source], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "textil-design.svg";
+      link.click();
+      URL.revokeObjectURL(url);
+      handles.forEach(h => h.style.display = "");
+    }
+  </script>
 </body>
 </html>
