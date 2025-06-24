@@ -34,25 +34,15 @@
       const g = document.createElementNS(svg.namespaceURI, "g");
       g.setAttribute("transform", "translate(100,100) rotate(0) scale(1)");
 
-      const move = document.createElementNS(svg.namespaceURI, "circle");
-      move.setAttribute("r", 6); move.setAttribute("fill", "black");
-      move.setAttribute("cx", 0); move.setAttribute("cy", 0); move.classList.add("handle");
+      const move = createHandle("circle", { cx: 0, cy: 0, r: 6, fill: "black" });
+      const rot = createHandle("text", { x: 40, y: -10, fill: "red", fontSize: 16, textContent: "⟳" });
+      const scale = createHandle("text", { x: 40, y: 40, fill: "green", fontSize: 16, textContent: "⤢" });
+      const del = createHandle("text", { x: -20, y: -10, fill: "gray", fontSize: 16, textContent: "🗑️" });
+
       g.appendChild(move);
-
-      const rot = document.createElementNS(svg.namespaceURI, "text");
-      rot.textContent = "⟳"; rot.setAttribute("x", 40); rot.setAttribute("y", -10);
-      rot.setAttribute("font-size", "16"); rot.setAttribute("fill", "red");
-      rot.classList.add("handle"); g.appendChild(rot);
-
-      const scale = document.createElementNS(svg.namespaceURI, "text");
-      scale.textContent = "⤢"; scale.setAttribute("x", 40); scale.setAttribute("y", 40);
-      scale.setAttribute("font-size", "16"); scale.setAttribute("fill", "green");
-      scale.classList.add("handle"); g.appendChild(scale);
-
-      const del = document.createElementNS(svg.namespaceURI, "text");
-      del.textContent = "🗑️"; del.setAttribute("x", -20); del.setAttribute("y", -10);
-      del.setAttribute("font-size", "16"); del.setAttribute("fill", "gray");
-      del.classList.add("handle"); g.appendChild(del);
+      g.appendChild(rot);
+      g.appendChild(scale);
+      g.appendChild(del);
 
       del.addEventListener("click", () => g.remove());
       rot.addEventListener("click", () => update(g, 0, 0, 15, 1));
@@ -70,6 +60,16 @@
       return g;
     }
 
+    function createHandle(type, attrs) {
+      const el = document.createElementNS(svg.namespaceURI, type);
+      for (let [key, val] of Object.entries(attrs)) {
+        if (key === "textContent") el.textContent = val;
+        else el.setAttribute(key, val);
+      }
+      el.classList.add("handle");
+      return el;
+    }
+
     function update(g, dx, dy, dr, ds) {
       let [x, y, r, s] = g.getAttribute("transform").match(/[-.\\d]+/g).map(Number);
       x += dx; y += dy; r = (r + dr) % 360; s = Math.min(Math.max(s * ds, 0.2), 5);
@@ -85,8 +85,10 @@
     function addText() {
       const g = createGroup();
       const foreign = document.createElementNS(svg.namespaceURI, "foreignObject");
-      foreign.setAttribute("x", 0); foreign.setAttribute("y", 0);
-      foreign.setAttribute("width", 200); foreign.setAttribute("height", 50);
+      foreign.setAttribute("x", 0);
+      foreign.setAttribute("y", 0);
+      foreign.setAttribute("width", 200);
+      foreign.setAttribute("height", 50);
 
       const div = document.createElement("div");
       div.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
