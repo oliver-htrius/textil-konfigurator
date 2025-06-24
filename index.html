@@ -207,16 +207,21 @@
   }
 
   function downloadSVG() {
-    const serializer = new XMLSerializer();
-    const source = serializer.serializeToString(svg);
-    const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "textil-design.svg";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
+  const handles = svg.querySelectorAll(".handle");
+  handles.forEach(h => h.style.display = "none"); // temporär ausblenden
+
+  const serializer = new XMLSerializer();
+  const source = serializer.serializeToString(svg);
+  const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "textil-design.svg";
+  link.click();
+  URL.revokeObjectURL(url);
+
+  handles.forEach(h => h.style.display = ""); // wieder einblenden
+}
 </script>
 </body>
 </html>
