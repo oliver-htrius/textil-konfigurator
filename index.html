@@ -71,15 +71,12 @@
     }
 
     function update(g, dx, dy, dr, ds) {
-      let [x, y, r, s] = g.getAttribute("transform").match(/[-.\\d]+/g).map(Number);
-      x += dx; y += dy; r = (r + dr) % 360; s = Math.min(Math.max(s * ds, 0.2), 5);
-      g.setAttribute("transform", `translate(${x},${y}) rotate(${r}) scale(${s})`);
-      const t = g.querySelector("foreignObject");
-      if (t) {
-        const div = t.querySelector("div");
-        div.style.color = document.getElementById("color").value;
-        div.style.fontFamily = document.getElementById("font").value;
-      }
+  let t = g.getAttribute("transform") || "translate(0,0) rotate(0) scale(1)";
+  let [x = 0, y = 0, r = 0, s = 1] = (t.match(/[-.\d]+/g) || []).map(Number);
+  x += dx; y += dy; r = (r + dr) % 360; s = Math.min(Math.max(s * ds, 0.2), 5);
+  g.setAttribute("transform", `translate(${x},${y}) rotate(${r}) scale(${s})`);
+}
+
     }
 
     function addText() {
