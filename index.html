@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -6,25 +5,10 @@
   <title>Textil-Konfigurator</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.6.0/fabric.min.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: transparent;
-      text-align: center;
-      margin: 0;
-      padding: 10px;
-    }
-    canvas {
-      border: 1px solid #ccc;
-      background: transparent;
-    }
-    .controls {
-      margin-top: 15px;
-    }
-    .controls button, .controls input {
-      margin: 5px;
-      padding: 8px 12px;
-      font-size: 14px;
-    }
+    body { font-family: Arial, sans-serif; margin:0; padding:10px; background:transparent; text-align:center; }
+    canvas { border:1px solid #ccc; background:transparent; }
+    .controls { margin-top:10px; }
+    .controls button, .controls input { margin:5px; padding:8px 12px; font-size:14px; }
   </style>
 </head>
 <body>
@@ -35,17 +19,13 @@
     <button id="saveBtn">Speichern</button>
   </div>
   <canvas id="textilCanvas" width="450" height="900"></canvas>
-
   <script>
-    window.addEventListener('DOMContentLoaded', function () {
-      const canvas = new fabric.Canvas('textilCanvas', {
-        backgroundColor: null
-      });
-
-      document.getElementById('imgUploader').addEventListener('change', function (e) {
+    window.addEventListener('DOMContentLoaded', () => {
+      const canvas = new fabric.Canvas('textilCanvas',{ backgroundColor:null });
+      document.getElementById('imgUploader').addEventListener('change', e => {
         const reader = new FileReader();
-        reader.onload = function (f) {
-          fabric.Image.fromURL(f.target.result, function (img) {
+        reader.onload = f => {
+          fabric.Image.fromURL(f.target.result, img => {
             img.scaleToWidth(200);
             img.center();
             canvas.add(img);
@@ -53,25 +33,15 @@
         };
         reader.readAsDataURL(e.target.files[0]);
       });
-
-      document.getElementById('addTextBtn').addEventListener('click', function () {
-        const text = new fabric.IText('Dein Text', {
-          left: 100,
-          top: 100,
-          fontSize: 24,
-          fill: '#000',
-        });
+      document.getElementById('addTextBtn').addEventListener('click', () => {
+        const text = new fabric.IText('Dein Text', { left:100, top:100, fontSize:24, fill:'#000' });
         canvas.add(text);
         canvas.setActiveObject(text);
       });
-
-      document.getElementById('saveBtn').addEventListener('click', function () {
+      document.getElementById('saveBtn').addEventListener('click', () => {
         const link = document.createElement('a');
         link.download = 'textil-design.png';
-        link.href = canvas.toDataURL({
-          format: 'png',
-          quality: 1
-        });
+        link.href = canvas.toDataURL({format:'png',quality:1});
         link.click();
       });
     });
