@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Textil-Konfigurator (336 × 560 px, SVG = 120 × 200 mm)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+  <style>
+    body {
+      background-color: #555;
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+      color: white;
+    }
+    h2 {
+      margin-bottom: 10px;
+    }
+    .controls {
+      margin-bottom: 10px;
+    }
+    .object-controls {
+      display: flex;
+      gap: 5px;
+      justify-content: center;
+      margin-top: 5px;
+    }
+    .object-controls button {
+      font-size: 14px;
+      padding: 2px 6px;
+    }
+    .canvas-wrapper {
+      display: flex;
+      justify-content: center;
+    }
+    canvas {
+      border: 1px dashed #ccc;
+      background-color: transparent;
+    }
+  </style>
+</head>
+<body>
+  <h2>Textil-Konfigurator (336 × 560 px = 120 × 200 mm)</h2>
+  <div class="controls">
+    <input type="file" id="fileInput" accept=".svg" />
+    <button onclick="addText()">Text</button>
+    <button onclick="saveAsSVG()">SVG speichern</button>
+    <br>
+    <label for="fontFamily">Schriftart:</label>
+    <select id="fontFamily" onchange="updateTextFont()">
+      <option value="Arial">Arial</option>
+      <option value="Verdana">Verdana</option>
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Courier New">Courier New</option>
+    </select>
+    <label for="fontColor">Farbe:</label>
+    <input type="color" id="fontColor" value="#ffffff" onchange="updateTextColor()">
+  </div>
+
+  <div class="canvas-wrapper">
+    <canvas id="canvas" width="336" height="560"></canvas>
+  </div>
+
+  <script>
+    const canvas = new fabric.Canvas('canvas', {
+      preserveObjectStacking: true
+    });
+
+    function addText() {
+      const text = new fabric.IText('Text', {
+        left: 100,
+        top: 100,
+        fontFamily: document.getElementById('fontFamily').value,
+        fill: document.getElementById('fontColor').value,
+        fontSize: 24,
+        editable: true,
+        borderColor: 'gray',
+        cornerColor: 'white',
+        cornerSize: 8,
+        transparentCorners: false,
+        hasRotatingPoint: true,
+        rotatingPointOffset: 20,
+        lockScalingFlip: true
+      });
+      addControls(text);
+      canvas.add(text);
+      canvas.setActiveObject(text);
+    }
+
+    function updateTextFont() {
+      const obj = canvas.getActiveObject();
+      if (obj && obj.type === 'i-text') {
+        obj.set("fontFamily", document.getElementById("fontFamily").value);
+        canvas.requestRenderAll();
+      }
+    }
+
+    function updateTextColor() {
+      const obj = canvas.getActiveObject();
+      if (obj && obj.type === 'i-text') {
+        obj.set("fill", document.getElementById("fontColor").value);
+        canvas.requestRenderAll();
+      }
+    }
+
+    function addControls(obj) {
+      obj.controls = fabric.Object.prototype.controls;
+
+      obj.on('selected', function() {
+        removeAllControlElements();
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'object-controls';
+        wrapper.id = 'control-wrapper';
+
+        const rotateLeftBtn = document.createElement('button');
+        rotateLeftBtn.textContent = '⟲';
+        rotateLeftBtn.onclick = () => { obj.rotate((obj.angle - 15) % 360); canvas.requestRenderAll(); };
+
+        const rotateRightBtn = document.createElement('button');
+        rotateRightBtn.textContent = '⟳';
+        rotateRightBtn.onclick = () => { obj.rotate((obj.angle + 15) % 360); canvas.requestRenderAll(); };
+
+        const scaleUpBtn = document.createElement('button');
+        scaleUpBtn.textContent = '⤢';
+        scaleUpBtn.onclick = () => { obj.scale(obj.scaleX * 1.1); canvas.requestRenderAll(); };
+
+        const scaleDownBtn = document.createElement('button');
+        scaleDownBtn.textContent = '⤡';
+        scaleDownBtn.onclick = () => { obj.scale(obj.scaleX * 0.9); canvas.requestRenderAll(); };
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '🗑️';
+        deleteBtn.onclick = () => { canvas.remove(obj); removeAllControlElements(); };
+
+        wrapper.append(rotateLeftBtn, rotateRightBtn, scaleUpBtn, scaleDownBtn, deleteBtn);
+        document.body.appendChild(wrapper);
+      });
+
+      obj.on('deselected', removeAllControlElements);
+    }
+
+    function removeAllControlElements() {
+      const el = document.getElementById('control-wrapper');
+      if (el) el.remove();
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function (e) {
+      const reader = new FileReader();
+      reader.onload = function (f) {
+        fabric.loadSVGFromString(f.target.result, function (objects, options) {
+          const obj = fabric.util.groupSVGElements(objects, options);
+          obj.set({
+            left: 100,
+            top: 100,
+            scaleX: 0.5,
+            scaleY: 0.5,
+            lockScalingFlip: true
+          });
+          addControls(obj);
+          canvas.add(obj);
+          canvas.setActiveObject(obj);
+        });
+      };
+      reader.readAsText(e.target.files[0]);
+    });
+
+    function saveAsSVG() {
+      const svg = canvas.toSVG({
+        width: 120, // in mm
+        height: 200,
+        viewBox: {
+          x: 0,
+          y: 0,
+          width: canvas.getWidth(),
+          height: canvas.getHeight()
+        }
+      }).replace('<svg ', '<svg width="120mm" height="200mm" ');
+      const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "konfiguration.svg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
