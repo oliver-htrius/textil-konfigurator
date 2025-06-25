@@ -172,20 +172,22 @@
       reader.readAsText(e.target.files[0]);
     });
 
-    function saveAsSVG() {
-  const svg = canvas.toSVG();
-  // Füge width und height im mm-Format direkt ein, aber ersetze vorherige Angaben
-  const cleanedSVG = svg
-    .replace(/width="[^"]+"/, 'width="120mm"')
-    .replace(/height="[^"]+"/, 'height="200mm"');
-    
-  const blob = new Blob([cleanedSVG], { type: "image/svg+xml;charset=utf-8" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "konfiguration.svg";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+    function sendSVGViaEmail() {
+  const svg = canvas.toSVG().replace('<svg ', '<svg width="120mm" height="200mm" ');
+  const encoded = btoa(unescape(encodeURIComponent(svg)));
+
+  wixWindow.openLightbox("Sende SVG..."); // optional
+
+  wixData.query("email")
+    .then(() => {
+      return wixFetch.post('https://www.oliver-htrius.com/_functions/sendSVGEmail', {
+        body: {
+          svgContent: encoded
+        }
+      });
+    })
+    .then(() => console.log("E-Mail versendet"))
+    .catch(err => console.error("Fehler beim Senden:", err));
 }
   </script>
 </body>
