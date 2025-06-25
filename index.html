@@ -193,17 +193,17 @@
     const svg = canvas.toSVG().replace('<svg ', '<svg width="120mm" height="200mm" ');
     const base64svg = btoa(unescape(encodeURIComponent(svg)));
 
-    fetch('/_functions/svgMail/sendSVGEmail', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        svgBase64: base64svg,
-        userEmail: email,
-        companyName: company
-      })
+      fetch('https://www.htrius.com/_functions/sendSVGEmail', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      svgBase64: base64svg,
+      userEmail: email,
+      companyName: company
     })
-      .then(res => res.ok ? alert("Erfolgreich gesendet!") : alert("Fehler beim Senden."))
-      .catch(err => console.error(err));
+  })
+    .then(res => res.ok ? alert("Erfolgreich gesendet!") : alert("Fehler beim Senden."))
+    .catch(err => console.error(err));
   }
 </script>
 </body>
