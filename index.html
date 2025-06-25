@@ -67,6 +67,15 @@
   <div class="canvas-wrapper">
     <canvas id="canvas" width="336" height="560"></canvas>
   </div>
+<div class="form-fields">
+  <label for="userEmail">Deine E-Mail:</label>
+  <input type="email" id="userEmail" placeholder="max@firma.de" required />
+
+  <label for="companyName">Unternehmen:</label>
+  <input type="text" id="companyName" placeholder="Firmenname" required />
+
+  <button onclick="sendSVG()">SVG speichern & senden</button>
+</div>
 
   <script>
     const canvas = new fabric.Canvas('canvas', {
@@ -172,23 +181,30 @@
       reader.readAsText(e.target.files[0]);
     });
 
-    function sendSVGViaEmail() {
-  const svg = canvas.toSVG().replace('<svg ', '<svg width="120mm" height="200mm" ');
-  const encoded = btoa(unescape(encodeURIComponent(svg)));
+    function sendSVG() {
+    const email = document.getElementById('userEmail').value;
+    const company = document.getElementById('companyName').value;
 
-  wixWindow.openLightbox("Sende SVG..."); // optional
+    if (!email || !company) {
+      alert("Bitte E-Mail und Unternehmen angeben.");
+      return;
+    }
 
-  wixData.query("email")
-    .then(() => {
-      return wixFetch.post('https://www.oliver-htrius.com/_functions/sendSVGEmail', {
-        body: {
-          svgContent: encoded
-        }
-      });
+    const svg = canvas.toSVG().replace('<svg ', '<svg width="120mm" height="200mm" ');
+    const base64svg = btoa(unescape(encodeURIComponent(svg)));
+
+    fetch('/_functions/svgMail/sendSVGEmail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        svgBase64: base64svg,
+        userEmail: email,
+        companyName: company
+      })
     })
-    .then(() => console.log("E-Mail versendet"))
-    .catch(err => console.error("Fehler beim Senden:", err));
-}
-  </script>
+      .then(res => res.ok ? alert("Erfolgreich gesendet!") : alert("Fehler beim Senden."))
+      .catch(err => console.error(err));
+  }
+</script>
 </body>
 </html>
