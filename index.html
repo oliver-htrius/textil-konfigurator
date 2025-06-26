@@ -8,17 +8,22 @@
     html, body {
       margin: 0;
       padding: 20px;
-      background: transparent;
+      background: transparent !important;
       font-family: sans-serif;
       text-align: center;
       color: white;
     }
 
-    .controls, .object-controls {
-      margin: 10px 0;
+    .controls {
       display: flex;
-      justify-content: center;
+      flex-wrap: wrap;
       gap: 10px;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .form-fields {
+      margin-top: 10px;
     }
 
     .canvas-wrapper {
@@ -32,11 +37,26 @@
       background-color: transparent;
     }
 
+    .object-controls {
+      display: flex;
+      gap: 5px;
+      justify-content: center;
+      margin-top: 5px;
+    }
+
+    .object-controls button {
+      font-size: 14px;
+      padding: 2px 6px;
+    }
+
     .grid-line {
-      stroke: rgba(255, 255, 255, 0.2);
+      stroke: #666;
       stroke-width: 0.5;
-      selectable: false;
-      evented: false;
+      opacity: 0.2;
+    }
+
+    button {
+      cursor: pointer;
     }
   </style>
 </head>
@@ -45,12 +65,9 @@
 
   <div class="controls">
     <input type="file" id="fileInput" accept=".svg" />
+    <button onclick="toggleGrid()">Raster ein/aus</button>
     <button onclick="addText()">Text hinzufügen</button>
-    <button onclick="saveAsSVG()">SVG speichern</button>
-    <label>
-      Raster:
-      <input type="checkbox" id="toggleGrid" onchange="toggleGrid()" />
-    </label>
+
     <label for="fontFamily">Schriftart:</label>
     <select id="fontFamily" onchange="updateTextFont()">
       <option value="Arial">Arial</option>
@@ -58,17 +75,60 @@
       <option value="Times New Roman">Times New Roman</option>
       <option value="Courier New">Courier New</option>
     </select>
+
     <label for="fontColor">Farbe:</label>
-    <input type="color" id="fontColor" value="#ffffff" onchange="updateTextColor()" />
+    <input type="color" id="fontColor" value="#ffffff" onchange="updateTextColor()">
   </div>
 
   <div class="canvas-wrapper">
     <canvas id="canvas" width="336" height="560"></canvas>
   </div>
 
+  <div class="form-fields">
+    <button onclick="saveAsSVG()">Konfiguration speichern</button>
+  </div>
+
   <script>
-    const canvas = new fabric.Canvas('canvas', { preserveObjectStacking: true });
+    const canvas = new fabric.Canvas('canvas', {
+      preserveObjectStacking: true
+    });
+
     let gridLines = [];
+
+    function toggleGrid() {
+      if (gridLines.length > 0) {
+        gridLines.forEach(line => canvas.remove(line));
+        gridLines = [];
+      } else {
+        const step = 28; // 28 px ≈ 1 cm bei 96 DPI
+
+        for (let i = 1; i < canvas.width / step; i++) {
+          const v = new fabric.Line([i * step, 0, i * step, canvas.height], {
+            selectable: false,
+            stroke: '#666',
+            strokeWidth: 0.5,
+            opacity: 0.2,
+            evented: false
+          });
+          canvas.add(v);
+          gridLines.push(v);
+        }
+
+        for (let i = 1; i < canvas.height / step; i++) {
+          const h = new fabric.Line([0, i * step, canvas.width, i * step], {
+            selectable: false,
+            stroke: '#666',
+            strokeWidth: 0.5,
+            opacity: 0.2,
+            evented: false
+          });
+          canvas.add(h);
+          gridLines.push(h);
+        }
+        canvas.sendToBack(...gridLines);
+      }
+      canvas.requestRenderAll();
+    }
 
     function addText() {
       const text = new fabric.IText('Text', {
@@ -110,7 +170,7 @@
     function addControls(obj) {
       obj.controls = fabric.Object.prototype.controls;
 
-      obj.on('selected', function () {
+      obj.on('selected', function() {
         removeAllControlElements();
 
         const wrapper = document.createElement('div');
@@ -138,95 +198,4 @@
         deleteBtn.onclick = () => { canvas.remove(obj); removeAllControlElements(); };
 
         wrapper.append(rotateLeftBtn, rotateRightBtn, scaleUpBtn, scaleDownBtn, deleteBtn);
-        document.body.appendChild(wrapper);
-      });
-
-      obj.on('deselected', removeAllControlElements);
-    }
-
-    function removeAllControlElements() {
-      const el = document.getElementById('control-wrapper');
-      if (el) el.remove();
-    }
-
-    document.getElementById('fileInput').addEventListener('change', function (e) {
-      const reader = new FileReader();
-      reader.onload = function (f) {
-        fabric.loadSVGFromString(f.target.result, function (objects, options) {
-          const obj = fabric.util.groupSVGElements(objects, options);
-          obj.set({
-            left: 100,
-            top: 100,
-            scaleX: 0.5,
-            scaleY: 0.5,
-            lockScalingFlip: true
-          });
-          addControls(obj);
-          canvas.add(obj);
-          canvas.setActiveObject(obj);
-        });
-      };
-      reader.readAsText(e.target.files[0]);
-    });
-
-    function saveAsSVG() {
-      // Temporär Raster entfernen
-      gridLines.forEach(line => canvas.remove(line));
-      const svgData = canvas.toSVG().replace('<svg ', '<svg width="120mm" height="200mm" ');
-      const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "konfiguration.svg";
-      link.click();
-      // Raster ggf. wieder einblenden
-      if (document.getElementById('toggleGrid').checked) drawGrid();
-    }
-
-    function toggleGrid() {
-      if (document.getElementById('toggleGrid').checked) {
-        drawGrid();
-      } else {
-        clearGrid();
-      }
-    }
-
-    function drawGrid() {
-      clearGrid();
-      const spacing = 20;
-      const width = canvas.getWidth();
-      const height = canvas.getHeight();
-
-      for (let x = spacing; x < width; x += spacing) {
-        const line = new fabric.Line([x, 0, x, height], {
-          stroke: '#ccc',
-          strokeWidth: 0.5,
-          selectable: false,
-          evented: false
-        });
-        canvas.add(line);
-        gridLines.push(line);
-      }
-
-      for (let y = spacing; y < height; y += spacing) {
-        const line = new fabric.Line([0, y, width, y], {
-          stroke: '#ccc',
-          strokeWidth: 0.5,
-          selectable: false,
-          evented: false
-        });
-        canvas.add(line);
-        gridLines.push(line);
-      }
-
-      canvas.sendToBack(...gridLines);
-      canvas.requestRenderAll();
-    }
-
-    function clearGrid() {
-      gridLines.forEach(line => canvas.remove(line));
-      gridLines = [];
-      canvas.requestRenderAll();
-    }
-  </script>
-</body>
-</html>
+        document
