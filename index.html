@@ -2,231 +2,246 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <title>Textil-Konfigurator</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Textil Konfigurator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.6.0/fabric.min.js"></script>
+
+  <!-- Lokale Schriftart -->
   <style>
-    html, body {
-      margin: 0;
-      padding: 20px;
-      background-color: transparent;
-      font-family: sans-serif;
+    @font-face {
+      font-family: 'Conthrax';
+      src: url('conthrax-sb.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    body {
+      background-color: #1a1a1a;
       color: white;
+      font-family: 'Conthrax', sans-serif;
       text-align: center;
+      margin: 0;
+      padding: 0;
     }
 
-    .controls {
-      margin-bottom: 10px;
-    }
-
-    .canvas-wrapper {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 10px;
+    #canvas-container {
+      position: relative;
+      margin: 20px auto;
+      width: 480px;
+      height: 800px;
     }
 
     canvas {
-      border: 1px dashed #ccc;
-      background-color: transparent;
+      border: 1px dashed white;
     }
 
-    .object-controls {
+    #controls {
+      margin: 20px auto;
       display: flex;
-      gap: 5px;
+      flex-wrap: wrap;
       justify-content: center;
-      margin-top: 5px;
+      gap: 10px;
     }
 
-    .object-controls button {
+    button, select, input[type="color"] {
+      background: #2c2c2c;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      padding: 10px 15px;
+      font-family: 'Conthrax', sans-serif;
       font-size: 14px;
-      padding: 2px 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    button:hover, select:hover, input[type="color"]:hover {
+      background: #444;
+    }
+
+    #save-button {
+      margin: 30px auto;
+      background: #00b894;
+    }
+
+    #save-button:hover {
+      background: #00a383;
     }
   </style>
 </head>
 <body>
-  <h2>Textil-Konfigurator</h2>
+  <h1>Textil - Konfigurator</h1>
 
-  <div class="controls">
-    <input type="file" id="fileInput" accept=".svg" />
+  <div id="controls">
+    <input type="file" id="fileUpload" accept="image/svg+xml" />
     <button onclick="toggleGrid()">Raster ein/aus</button>
     <button onclick="addText()">Text hinzufügen</button>
-    <label for="fontFamily">Schriftart:</label>
-    <select id="fontFamily" onchange="updateTextFont()">
+    <select id="fontSelect">
+      <option value="Conthrax">Conthrax (hTRIUS)</option>
       <option value="Arial">Arial</option>
-      <option value="Verdana">Verdana</option>
-      <option value="Times New Roman">Times New Roman</option>
       <option value="Courier New">Courier New</option>
+      <option value="Times New Roman">Times New Roman</option>
     </select>
-    <label for="fontColor">Farbe:</label>
-    <input type="color" id="fontColor" value="#ffffff" onchange="updateTextColor()">
+    <input type="color" id="colorPicker" />
   </div>
 
-  <div class="canvas-wrapper">
-    <canvas id="canvas" width="336" height="560"></canvas>
+  <div id="canvas-container">
+    <canvas id="canvas" width="480" height="800"></canvas>
   </div>
 
-  <button onclick="saveAsSVG()">Konfiguration speichern</button>
+  <button id="save-button" onclick="saveSVG()">Konfiguration speichern</button>
 
   <script>
     const canvas = new fabric.Canvas('canvas', {
       preserveObjectStacking: true
     });
 
-    // GRID-FUNKTION
-    let gridVisible = false;
-    const gridGroup = [];
+    const exportWidth = 120;
+    const exportHeight = 200;
+
+    let gridVisible = true;
+    const gridSize = 40;
+    let gridLines = [];
+
+    function drawGrid() {
+      gridLines.forEach(line => canvas.remove(line));
+      gridLines = [];
+
+      if (!gridVisible) return;
+
+      for (let i = 0; i < canvas.width; i += gridSize) {
+        const vertical = new fabric.Line([i, 0, i, canvas.height], {
+          stroke: '#ccc', selectable: false, evented: false
+        });
+        gridLines.push(vertical);
+        canvas.add(vertical);
+      }
+
+      for (let i = 0; i < canvas.height; i += gridSize) {
+        const horizontal = new fabric.Line([0, i, canvas.width, i], {
+          stroke: '#ccc', selectable: false, evented: false
+        });
+        gridLines.push(horizontal);
+        canvas.add(horizontal);
+      }
+
+      canvas.sendToBack(...gridLines);
+    }
+
+    drawGrid();
 
     function toggleGrid() {
-      if (gridVisible) {
-        gridGroup.forEach(line => canvas.remove(line));
-        gridVisible = false;
-      } else {
-        const spacing = 28; // ~10mm bei 96 DPI
-        for (let i = spacing; i < canvas.width; i += spacing) {
-          const v = new fabric.Line([i, 0, i, canvas.height], {
-            stroke: '#aaa',
-            selectable: false,
-            evented: false,
-            excludeFromExport: true
-          });
-          canvas.add(v);
-          gridGroup.push(v);
-        }
-        for (let i = spacing; i < canvas.height; i += spacing) {
-          const h = new fabric.Line([0, i, canvas.width, i], {
-            stroke: '#aaa',
-            selectable: false,
-            evented: false,
-            excludeFromExport: true
-          });
-          canvas.add(h);
-          gridGroup.push(h);
-        }
-        gridVisible = true;
-        canvas.sendToBack(...gridGroup);
-      }
-      canvas.requestRenderAll();
+      gridVisible = !gridVisible;
+      drawGrid();
     }
+
+    document.getElementById('fileUpload').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (f) {
+        fabric.loadSVGFromString(f.target.result, function (objects, options) {
+          const svg = fabric.util.groupSVGElements(objects, options);
+          svg.set({ left: 100, top: 100, scaleX: 1, scaleY: 1 });
+          canvas.add(svg);
+        });
+      };
+      reader.readAsText(file);
+    });
 
     function addText() {
       const text = new fabric.IText('Text', {
         left: 100,
-        top: 100,
-        fontFamily: document.getElementById('fontFamily').value,
-        fill: document.getElementById('fontColor').value,
-        fontSize: 24,
-        editable: true,
-        borderColor: 'gray',
-        cornerColor: 'white',
-        cornerSize: 8,
-        transparentCorners: false,
-        hasRotatingPoint: true,
-        rotatingPointOffset: 20,
-        lockScalingFlip: true
+        top: 150,
+        fill: document.getElementById('colorPicker').value,
+        fontFamily: document.getElementById('fontSelect').value,
+        fontSize: 32
       });
-      addControls(text);
       canvas.add(text);
       canvas.setActiveObject(text);
     }
 
-    function updateTextFont() {
-      const obj = canvas.getActiveObject();
-      if (obj && obj.type === 'i-text') {
-        obj.set("fontFamily", document.getElementById("fontFamily").value);
-        canvas.requestRenderAll();
+    document.getElementById('fontSelect').addEventListener('change', function () {
+      const active = canvas.getActiveObject();
+      if (active && active.type === 'i-text') {
+        active.set("fontFamily", this.value);
+        canvas.renderAll();
       }
-    }
-
-    function updateTextColor() {
-      const obj = canvas.getActiveObject();
-      if (obj && obj.type === 'i-text') {
-        obj.set("fill", document.getElementById("fontColor").value);
-        canvas.requestRenderAll();
-      }
-    }
-
-    function addControls(obj) {
-      obj.controls = fabric.Object.prototype.controls;
-
-      obj.on('selected', function() {
-        removeAllControlElements();
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'object-controls';
-        wrapper.id = 'control-wrapper';
-
-        const rotateLeftBtn = document.createElement('button');
-        rotateLeftBtn.textContent = '⟲';
-        rotateLeftBtn.onclick = () => { obj.rotate((obj.angle - 15) % 360); canvas.requestRenderAll(); };
-
-        const rotateRightBtn = document.createElement('button');
-        rotateRightBtn.textContent = '⟳';
-        rotateRightBtn.onclick = () => { obj.rotate((obj.angle + 15) % 360); canvas.requestRenderAll(); };
-
-        const scaleUpBtn = document.createElement('button');
-        scaleUpBtn.textContent = '⤢';
-        scaleUpBtn.onclick = () => { obj.scale(obj.scaleX * 1.1); canvas.requestRenderAll(); };
-
-        const scaleDownBtn = document.createElement('button');
-        scaleDownBtn.textContent = '⤡';
-        scaleDownBtn.onclick = () => { obj.scale(obj.scaleX * 0.9); canvas.requestRenderAll(); };
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '🗑️';
-        deleteBtn.onclick = () => { canvas.remove(obj); removeAllControlElements(); };
-
-        wrapper.append(rotateLeftBtn, rotateRightBtn, scaleUpBtn, scaleDownBtn, deleteBtn);
-        document.body.appendChild(wrapper);
-      });
-
-      obj.on('deselected', removeAllControlElements);
-    }
-
-    function removeAllControlElements() {
-      const el = document.getElementById('control-wrapper');
-      if (el) el.remove();
-    }
-
-    document.getElementById('fileInput').addEventListener('change', function (e) {
-      const reader = new FileReader();
-      reader.onload = function (f) {
-        fabric.loadSVGFromString(f.target.result, function (objects, options) {
-          const obj = fabric.util.groupSVGElements(objects, options);
-          obj.set({
-            left: 100,
-            top: 100,
-            scaleX: 0.5,
-            scaleY: 0.5,
-            lockScalingFlip: true
-          });
-          addControls(obj);
-          canvas.add(obj);
-          canvas.setActiveObject(obj);
-        });
-      };
-      reader.readAsText(e.target.files[0]);
     });
 
-    function saveAsSVG() {
-  const svg = canvas.toSVG({
-    viewBox: {
-      x: 0,
-      y: 0,
-      width: canvas.getWidth(),
-      height: canvas.getHeight()
+    document.getElementById('colorPicker').addEventListener('change', function () {
+      const active = canvas.getActiveObject();
+      if (active && active.set) {
+        active.set("fill", this.value);
+        canvas.renderAll();
+      }
+    });
+
+    canvas.on('object:scaling', function (e) {
+      const obj = e.target;
+      obj.set({
+        scaleX: Math.max(obj.scaleX, 0.1),
+        scaleY: Math.max(obj.scaleY, 0.1)
+      });
+    });
+
+    canvas.on('object:rotating', function (e) {
+      const snapAngles = [0, 90, 180, 270];
+      const threshold = 6;
+      let angle = e.target.angle;
+      for (let snap of snapAngles) {
+        if (Math.abs(angle - snap) < threshold) {
+          e.target.angle = snap;
+          break;
+        }
+      }
+    });
+
+    fabric.Object.prototype.set({
+      transparentCorners: false,
+      cornerStyle: 'circle',
+      cornerSize: 10,
+      borderColor: '#fff',
+      cornerColor: '#fff',
+      cornerStrokeColor: '#000',
+      hasBorders: false,
+      lockUniScaling: true,
+      lockScalingFlip: true,
+      hasControls: true,
+      hasRotatingPoint: true,
+      controls: {
+        ml: false,
+        mr: false,
+        mt: false,
+        mb: false,
+        bl: true,
+        br: true,
+        tl: true,
+        tr: true
+      }
+    });
+
+    function saveSVG() {
+      const clone = canvas.clone();
+      clone.getObjects().forEach(obj => {
+        if (gridLines.includes(obj)) clone.remove(obj);
+      });
+
+      const svg = clone.toSVG({ width: exportWidth, height: exportHeight });
+      const cleanedSVG = svg
+        .replace(/\s(width|height)="[^"]*"/g, '')
+        .replace('<svg ', `<svg width="${exportWidth}mm" height="${exportHeight}mm" `);
+
+      const blob = new Blob([cleanedSVG], { type: 'image/svg+xml' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'konfiguration.svg';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      parent.postMessage({ scrollTo: '#formularanker' }, '*');
     }
-  }).replace('<svg ', '<svg width="120mm" height="200mm" ');
-
-  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "konfiguration.svg";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  // ❗️ Sende Nachricht an Wix-Host-Seite
-  parent.postMessage({ scrollToForm: true }, "*");
-}
   </script>
 </body>
 </html>
