@@ -49,12 +49,6 @@
       padding: 2px 6px;
     }
 
-    .grid-line {
-      stroke: #666;
-      stroke-width: 0.5;
-      opacity: 0.2;
-    }
-
     button {
       cursor: pointer;
     }
@@ -65,11 +59,11 @@
 
   <div class="controls">
     <input type="file" id="fileInput" accept=".svg" />
-    <button onclick="toggleGrid()">Raster ein/aus</button>
-    <button onclick="addText()">Text hinzufügen</button>
+    <button id="gridToggleBtn">Raster ein/aus</button>
+    <button id="addTextBtn">Text hinzufügen</button>
 
     <label for="fontFamily">Schriftart:</label>
-    <select id="fontFamily" onchange="updateTextFont()">
+    <select id="fontFamily">
       <option value="Arial">Arial</option>
       <option value="Verdana">Verdana</option>
       <option value="Times New Roman">Times New Roman</option>
@@ -77,7 +71,7 @@
     </select>
 
     <label for="fontColor">Farbe:</label>
-    <input type="color" id="fontColor" value="#ffffff" onchange="updateTextColor()">
+    <input type="color" id="fontColor" value="#ffffff">
   </div>
 
   <div class="canvas-wrapper">
@@ -93,15 +87,16 @@
       preserveObjectStacking: true
     });
 
+    let gridVisible = false;
     let gridLines = [];
 
-    function toggleGrid() {
-      if (gridLines.length > 0) {
+    document.getElementById('gridToggleBtn').addEventListener('click', () => {
+      if (gridVisible) {
         gridLines.forEach(line => canvas.remove(line));
         gridLines = [];
+        gridVisible = false;
       } else {
-        const step = 28; // 28 px ≈ 1 cm bei 96 DPI
-
+        const step = 28; // 1 cm ≈ 28px
         for (let i = 1; i < canvas.width / step; i++) {
           const v = new fabric.Line([i * step, 0, i * step, canvas.height], {
             selectable: false,
@@ -125,12 +120,14 @@
           canvas.add(h);
           gridLines.push(h);
         }
+
         canvas.sendToBack(...gridLines);
+        gridVisible = true;
       }
       canvas.requestRenderAll();
-    }
+    });
 
-    function addText() {
+    document.getElementById('addTextBtn').addEventListener('click', () => {
       const text = new fabric.IText('Text', {
         left: 100,
         top: 100,
@@ -149,28 +146,28 @@
       addControls(text);
       canvas.add(text);
       canvas.setActiveObject(text);
-    }
+    });
 
-    function updateTextFont() {
+    document.getElementById('fontFamily').addEventListener('change', () => {
       const obj = canvas.getActiveObject();
       if (obj && obj.type === 'i-text') {
         obj.set("fontFamily", document.getElementById("fontFamily").value);
         canvas.requestRenderAll();
       }
-    }
+    });
 
-    function updateTextColor() {
+    document.getElementById('fontColor').addEventListener('change', () => {
       const obj = canvas.getActiveObject();
       if (obj && obj.type === 'i-text') {
         obj.set("fill", document.getElementById("fontColor").value);
         canvas.requestRenderAll();
       }
-    }
+    });
 
     function addControls(obj) {
       obj.controls = fabric.Object.prototype.controls;
 
-      obj.on('selected', function() {
+      obj.on('selected', function () {
         removeAllControlElements();
 
         const wrapper = document.createElement('div');
@@ -198,4 +195,60 @@
         deleteBtn.onclick = () => { canvas.remove(obj); removeAllControlElements(); };
 
         wrapper.append(rotateLeftBtn, rotateRightBtn, scaleUpBtn, scaleDownBtn, deleteBtn);
-        document
+        document.body.appendChild(wrapper);
+      });
+
+      obj.on('deselected', removeAllControlElements);
+    }
+
+    function removeAllControlElements() {
+      const el = document.getElementById('control-wrapper');
+      if (el) el.remove();
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function (e) {
+      const reader = new FileReader();
+      reader.onload = function (f) {
+        fabric.loadSVGFromString(f.target.result, function (objects, options) {
+          const obj = fabric.util.groupSVGElements(objects, options);
+          obj.set({
+            left: 100,
+            top: 100,
+            scaleX: 0.5,
+            scaleY: 0.5,
+            lockScalingFlip: true
+          });
+          addControls(obj);
+          canvas.add(obj);
+          canvas.setActiveObject(obj);
+        });
+      };
+      reader.readAsText(e.target.files[0]);
+    });
+
+    function saveAsSVG() {
+      const svg = canvas.toSVG({
+        viewBox: {
+          x: 0,
+          y: 0,
+          width: canvas.getWidth(),
+          height: canvas.getHeight()
+        }
+      });
+
+      const svgWithSize = svg
+        .replace(/<svg /, '<svg width="120mm" height="200mm" ')
+        .replace(/width="[^"]*"/, 'width="120mm"')
+        .replace(/height="[^"]*"/, 'height="200mm"');
+
+      const blob = new Blob([svgWithSize], { type: "image/svg+xml;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "konfiguration.svg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
