@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Textil Konfigurator</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.6.0/fabric.min.js"></script>
+  
+  <!-- Eigene Schriftart einbinden -->
   <style>
     @font-face {
       font-family: 'Conthrax';
-      src: url(https://github.com/oliver-htrius/textil-konfigurator/blob/main/conthrax-sb.ttf) format('truetype');
+      src: url('https://www.deine-domain.de/fonts/conthrax-sb.ttf') format('truetype');
     }
 
     body {
@@ -20,17 +22,6 @@
       padding: 0;
     }
 
-    #canvas-container {
-      position: relative;
-      margin: 20px auto;
-      width: 480px;
-      height: 800px;
-    }
-
-    canvas {
-      border: 1px dashed white;
-    }
-
     #controls {
       margin: 20px auto;
       display: flex;
@@ -40,10 +31,10 @@
     }
 
     button, select, input[type="color"] {
-      background: #d4ff00;
+      background: #D4FF00;
       border: none;
       border-radius: 8px;
-      color: black;
+      color: #000;
       padding: 10px 15px;
       font-family: 'Conthrax', sans-serif;
       font-size: 14px;
@@ -52,7 +43,18 @@
     }
 
     button:hover, select:hover, input[type="color"]:hover {
-      background: #b8e600;
+      background: #bce300;
+    }
+
+    #canvas-container {
+      position: relative;
+      margin: 20px auto;
+      width: 480px;
+      height: 800px;
+    }
+
+    canvas {
+      border: 1px dashed white;
     }
 
     #save-button {
@@ -106,6 +108,7 @@
         gridLines.push(vertical);
         canvas.add(vertical);
       }
+
       for (let i = 0; i < canvas.height; i += gridSize) {
         const horizontal = new fabric.Line([0, i, canvas.width, i], {
           stroke: '#ccc', selectable: false, evented: false
@@ -113,7 +116,8 @@
         gridLines.push(horizontal);
         canvas.add(horizontal);
       }
-      gridLines.forEach(line => canvas.sendToBack(line));
+
+      canvas.sendToBack(...gridLines);
     }
 
     drawGrid();
@@ -164,46 +168,12 @@
       }
     });
 
-    canvas.on('object:scaling', function (e) {
-      const obj = e.target;
-      obj.lockScalingFlip = true;
-      obj.lockUniScaling = true;
-    });
-
-    canvas.on('object:rotating', function (e) {
-      const snapAngles = [0, 90, 180, 270];
-      const threshold = 5;
-      let angle = e.target.angle;
-      for (let snap of snapAngles) {
-        if (Math.abs(angle - snap) < threshold) {
-          e.target.angle = snap;
-          break;
-        }
-      }
-    });
-
-    fabric.Object.prototype.set({
-      transparentCorners: false,
-      cornerStyle: 'circle',
-      cornerSize: 10,
-      borderColor: '#fff',
-      cornerColor: '#fff',
-      cornerStrokeColor: '#000',
-      hasBorders: true,
-      lockScalingFlip: true,
-      lockUniScaling: true,
-      hasControls: true,
-      // remove side controls
-      controls: {
-        ml: false, mr: false, mt: false, mb: false
-      }
-    });
-
     function saveSVG() {
       const clone = canvas.clone();
       clone.getObjects().forEach(obj => {
         if (gridLines.includes(obj)) clone.remove(obj);
       });
+
       const svg = clone.toSVG({ width: exportWidth, height: exportHeight });
       const cleanedSVG = svg.replace(/\s(width|height)="[^"]*"/g, '')
                              .replace('<svg ', `<svg width="${exportWidth}mm" height="${exportHeight}mm" `);
