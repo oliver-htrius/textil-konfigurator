@@ -36,21 +36,30 @@
       margin-top: 10px;
     }
 
-    .object-controls button {
-      font-size: 18px;
-      padding: 10px 12px;
+    .object-controls button,
+    .controls button,
+    .controls select,
+    .controls input[type="file"],
+    .controls input[type="color"] {
+      font-size: 16px;
+      padding: 10px 14px;
       border: none;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #444, #222);
+      border-radius: 10px;
+      background: linear-gradient(135deg, #4e4e4e, #2b2b2b);
       color: white;
       cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      transition: transform 0.2s ease, background 0.3s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      transition: all 0.3s ease;
     }
 
-    .object-controls button:hover {
-      background: linear-gradient(135deg, #666, #333);
+    .object-controls button:hover,
+    .controls button:hover {
+      background: linear-gradient(135deg, #6c6c6c, #3b3b3b);
       transform: scale(1.05);
+    }
+
+    .controls label {
+      margin: 0 6px;
     }
   </style>
 </head>
