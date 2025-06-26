@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Textil Konfigurator</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.6.0/fabric.min.js"></script>
-
-  <!-- Lokale Schriftart -->
+  
+  <!-- hTRIUS Schriftart -->
   <style>
     @font-face {
       font-family: 'Conthrax';
-      src: url('conthrax-sb.ttf') format('truetype');
+      src: url('https://www.deine-domain.de/fonts/conthrax-sb.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
     }
 
     body {
-      background-color: #1a1a1a;
+      background: transparent;
       color: white;
       font-family: 'Conthrax', sans-serif;
       text-align: center;
@@ -44,43 +44,45 @@
     }
 
     button, select, input[type="color"] {
-      background: #2c2c2c;
-      border: none;
+      background: #1a1a1a;
+      border: 1px solid #ebff00;
       border-radius: 8px;
-      color: white;
+      color: #ebff00;
       padding: 10px 15px;
       font-family: 'Conthrax', sans-serif;
-      font-size: 14px;
+      font-size: 12px;
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: background 0.3s;
     }
 
-    button:hover, select:hover, input[type="color"]:hover {
-      background: #444;
+    button:hover {
+      background: #ebff00;
+      color: black;
     }
 
     #save-button {
-      margin: 30px auto;
-      background: #00b894;
+      margin-top: 20px;
+      background: #ebff00;
+      color: black;
+      border: none;
     }
 
     #save-button:hover {
-      background: #00a383;
+      background: #d5e600;
     }
   </style>
 </head>
 <body>
   <h1>Textil - Konfigurator</h1>
-
   <div id="controls">
     <input type="file" id="fileUpload" accept="image/svg+xml" />
-    <button onclick="toggleGrid()">Raster ein/aus</button>
-    <button onclick="addText()">Text hinzufügen</button>
+    <button id="gridBtn">Raster ein/aus</button>
+    <button id="textBtn">Text hinzufügen</button>
     <select id="fontSelect">
-      <option value="Conthrax">Conthrax (hTRIUS)</option>
-      <option value="Arial">Arial</option>
-      <option value="Courier New">Courier New</option>
-      <option value="Times New Roman">Times New Roman</option>
+      <option>Arial</option>
+      <option>Courier New</option>
+      <option>Times New Roman</option>
+      <option>Conthrax</option>
     </select>
     <input type="color" id="colorPicker" />
   </div>
@@ -89,16 +91,12 @@
     <canvas id="canvas" width="480" height="800"></canvas>
   </div>
 
-  <button id="save-button" onclick="saveSVG()">Konfiguration speichern</button>
+  <button id="save-button">Konfiguration speichern</button>
 
   <script>
-    const canvas = new fabric.Canvas('canvas', {
-      preserveObjectStacking: true
-    });
-
+    const canvas = new fabric.Canvas('canvas', { preserveObjectStacking: true });
     const exportWidth = 120;
     const exportHeight = 200;
-
     let gridVisible = true;
     const gridSize = 40;
     let gridLines = [];
@@ -128,11 +126,20 @@
       canvas.sendToBack(...gridLines);
     }
 
-    drawGrid();
-
     function toggleGrid() {
       gridVisible = !gridVisible;
       drawGrid();
+    }
+
+    function addText() {
+      const text = new fabric.IText('Text', {
+        left: 100,
+        top: 150,
+        fill: document.getElementById('colorPicker').value,
+        fontFamily: document.getElementById('fontSelect').value,
+        fontSize: 32
+      });
+      canvas.add(text);
     }
 
     document.getElementById('fileUpload').addEventListener('change', function (e) {
@@ -148,18 +155,6 @@
       };
       reader.readAsText(file);
     });
-
-    function addText() {
-      const text = new fabric.IText('Text', {
-        left: 100,
-        top: 150,
-        fill: document.getElementById('colorPicker').value,
-        fontFamily: document.getElementById('fontSelect').value,
-        fontSize: 32
-      });
-      canvas.add(text);
-      canvas.setActiveObject(text);
-    }
 
     document.getElementById('fontSelect').addEventListener('change', function () {
       const active = canvas.getActiveObject();
@@ -179,6 +174,7 @@
 
     canvas.on('object:scaling', function (e) {
       const obj = e.target;
+      obj.lockScalingX = obj.lockScalingY = false;
       obj.set({
         scaleX: Math.max(obj.scaleX, 0.1),
         scaleY: Math.max(obj.scaleY, 0.1)
@@ -187,7 +183,7 @@
 
     canvas.on('object:rotating', function (e) {
       const snapAngles = [0, 90, 180, 270];
-      const threshold = 6;
+      const threshold = 5;
       let angle = e.target.angle;
       for (let snap of snapAngles) {
         if (Math.abs(angle - snap) < threshold) {
@@ -204,33 +200,20 @@
       borderColor: '#fff',
       cornerColor: '#fff',
       cornerStrokeColor: '#000',
-      hasBorders: false,
+      hasBorders: true,
       lockUniScaling: true,
-      lockScalingFlip: true,
-      hasControls: true,
-      hasRotatingPoint: true,
-      controls: {
-        ml: false,
-        mr: false,
-        mt: false,
-        mb: false,
-        bl: true,
-        br: true,
-        tl: true,
-        tr: true
-      }
+      lockScalingFlip: true
     });
 
-    function saveSVG() {
+    document.getElementById('save-button').addEventListener('click', () => {
       const clone = canvas.clone();
       clone.getObjects().forEach(obj => {
         if (gridLines.includes(obj)) clone.remove(obj);
       });
 
       const svg = clone.toSVG({ width: exportWidth, height: exportHeight });
-      const cleanedSVG = svg
-        .replace(/\s(width|height)="[^"]*"/g, '')
-        .replace('<svg ', `<svg width="${exportWidth}mm" height="${exportHeight}mm" `);
+      const cleanedSVG = svg.replace(/\s(width|height)="[^"]*"/g, '')
+                             .replace('<svg ', `<svg width="${exportWidth}mm" height="${exportHeight}mm" `);
 
       const blob = new Blob([cleanedSVG], { type: 'image/svg+xml' });
       const link = document.createElement('a');
@@ -241,7 +224,13 @@
       document.body.removeChild(link);
 
       parent.postMessage({ scrollTo: '#formularanker' }, '*');
-    }
+    });
+
+    // Funktionsbindung
+    document.getElementById('gridBtn').addEventListener('click', toggleGrid);
+    document.getElementById('textBtn').addEventListener('click', addText);
+
+    drawGrid(); // Initiales Raster
   </script>
 </body>
 </html>
