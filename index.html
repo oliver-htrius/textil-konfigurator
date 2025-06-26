@@ -8,17 +8,19 @@
     html, body {
       margin: 0;
       padding: 20px;
-      background: #1a1a1a;
-      color: white;
+      background-color: transparent;
       font-family: sans-serif;
+      color: white;
       text-align: center;
     }
 
     .controls {
+      margin-bottom: 10px;
+    }
+
+    .canvas-wrapper {
       display: flex;
-      flex-wrap: wrap;
       justify-content: center;
-      gap: 10px;
       margin-bottom: 10px;
     }
 
@@ -27,32 +29,16 @@
       background-color: transparent;
     }
 
-    .canvas-wrapper {
+    .object-controls {
       display: flex;
+      gap: 5px;
       justify-content: center;
-      position: relative;
-    }
-
-    #gridToggle {
       margin-top: 5px;
     }
 
-    .rasterLine {
-      stroke: rgba(255, 255, 255, 0.15);
-      stroke-width: 1;
-    }
-
-    button {
-      padding: 4px 10px;
-      cursor: pointer;
-    }
-
-    select, input[type="color"] {
-      padding: 2px;
-    }
-
-    #saveButton {
-      margin-top: 10px;
+    .object-controls button {
+      font-size: 14px;
+      padding: 2px 6px;
     }
   </style>
 </head>
@@ -61,71 +47,62 @@
 
   <div class="controls">
     <input type="file" id="fileInput" accept=".svg" />
-    <button id="gridToggle">Raster ein/aus</button>
-    <button id="addTextBtn">Text hinzufügen</button>
-
+    <button onclick="toggleGrid()">Raster ein/aus</button>
+    <button onclick="addText()">Text hinzufügen</button>
     <label for="fontFamily">Schriftart:</label>
-    <select id="fontFamily">
+    <select id="fontFamily" onchange="updateTextFont()">
       <option value="Arial">Arial</option>
       <option value="Verdana">Verdana</option>
       <option value="Times New Roman">Times New Roman</option>
       <option value="Courier New">Courier New</option>
     </select>
-
     <label for="fontColor">Farbe:</label>
-    <input type="color" id="fontColor" value="#ffffff">
+    <input type="color" id="fontColor" value="#ffffff" onchange="updateTextColor()">
   </div>
 
   <div class="canvas-wrapper">
     <canvas id="canvas" width="336" height="560"></canvas>
   </div>
 
-  <button id="saveButton">Konfiguration speichern</button>
+  <button onclick="saveAsSVG()">Konfiguration speichern</button>
 
   <script>
     const canvas = new fabric.Canvas('canvas', {
       preserveObjectStacking: true
     });
 
+    // GRID-FUNKTION
     let gridVisible = false;
-    let gridLines = [];
-
-    function drawGrid() {
-      const stepX = 28; // entspricht 1cm bei 336px/12cm
-      const stepY = 28; // entspricht 1cm bei 560px/20cm
-
-      for (let i = 0; i <= canvas.width; i += stepX) {
-        const line = new fabric.Line([i, 0, i, canvas.height], {
-          stroke: '#ffffff',
-          selectable: false,
-          evented: false,
-          strokeWidth: 0.5,
-          strokeDashArray: [2, 2]
-        });
-        canvas.add(line);
-        gridLines.push(line);
-      }
-
-      for (let j = 0; j <= canvas.height; j += stepY) {
-        const line = new fabric.Line([0, j, canvas.width, j], {
-          stroke: '#ffffff',
-          selectable: false,
-          evented: false,
-          strokeWidth: 0.5,
-          strokeDashArray: [2, 2]
-        });
-        canvas.add(line);
-        gridLines.push(line);
-      }
-    }
+    const gridGroup = [];
 
     function toggleGrid() {
-      gridVisible = !gridVisible;
       if (gridVisible) {
-        drawGrid();
+        gridGroup.forEach(line => canvas.remove(line));
+        gridVisible = false;
       } else {
-        gridLines.forEach(line => canvas.remove(line));
-        gridLines = [];
+        const spacing = 28; // ~10mm bei 96 DPI
+        for (let i = spacing; i < canvas.width; i += spacing) {
+          const v = new fabric.Line([i, 0, i, canvas.height], {
+            stroke: '#aaa',
+            selectable: false,
+            evented: false,
+            excludeFromExport: true
+          });
+          canvas.add(v);
+          gridGroup.push(v);
+        }
+        for (let i = spacing; i < canvas.height; i += spacing) {
+          const h = new fabric.Line([0, i, canvas.width, i], {
+            stroke: '#aaa',
+            selectable: false,
+            evented: false,
+            excludeFromExport: true
+          });
+          canvas.add(h);
+          gridGroup.push(h);
+        }
+        gridVisible = true;
+        canvas.sendToBack(...gridGroup);
       }
       canvas.requestRenderAll();
     }
@@ -146,30 +123,69 @@
         rotatingPointOffset: 20,
         lockScalingFlip: true
       });
+      addControls(text);
       canvas.add(text);
       canvas.setActiveObject(text);
     }
 
-    function saveAsSVG() {
-      // Entferne Rasterlinien vor dem Speichern
-      if (gridVisible) {
-        gridLines.forEach(line => canvas.remove(line));
+    function updateTextFont() {
+      const obj = canvas.getActiveObject();
+      if (obj && obj.type === 'i-text') {
+        obj.set("fontFamily", document.getElementById("fontFamily").value);
+        canvas.requestRenderAll();
       }
-
-      const svg = canvas.toSVG({ suppressPreamble: true });
-      const blob = new Blob([svg], { type: 'image/svg+xml' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'konfiguration.svg';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Raster ggf. wieder anzeigen
-      if (gridVisible) drawGrid();
     }
 
-    // SVG Upload
+    function updateTextColor() {
+      const obj = canvas.getActiveObject();
+      if (obj && obj.type === 'i-text') {
+        obj.set("fill", document.getElementById("fontColor").value);
+        canvas.requestRenderAll();
+      }
+    }
+
+    function addControls(obj) {
+      obj.controls = fabric.Object.prototype.controls;
+
+      obj.on('selected', function() {
+        removeAllControlElements();
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'object-controls';
+        wrapper.id = 'control-wrapper';
+
+        const rotateLeftBtn = document.createElement('button');
+        rotateLeftBtn.textContent = '⟲';
+        rotateLeftBtn.onclick = () => { obj.rotate((obj.angle - 15) % 360); canvas.requestRenderAll(); };
+
+        const rotateRightBtn = document.createElement('button');
+        rotateRightBtn.textContent = '⟳';
+        rotateRightBtn.onclick = () => { obj.rotate((obj.angle + 15) % 360); canvas.requestRenderAll(); };
+
+        const scaleUpBtn = document.createElement('button');
+        scaleUpBtn.textContent = '⤢';
+        scaleUpBtn.onclick = () => { obj.scale(obj.scaleX * 1.1); canvas.requestRenderAll(); };
+
+        const scaleDownBtn = document.createElement('button');
+        scaleDownBtn.textContent = '⤡';
+        scaleDownBtn.onclick = () => { obj.scale(obj.scaleX * 0.9); canvas.requestRenderAll(); };
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '🗑️';
+        deleteBtn.onclick = () => { canvas.remove(obj); removeAllControlElements(); };
+
+        wrapper.append(rotateLeftBtn, rotateRightBtn, scaleUpBtn, scaleDownBtn, deleteBtn);
+        document.body.appendChild(wrapper);
+      });
+
+      obj.on('deselected', removeAllControlElements);
+    }
+
+    function removeAllControlElements() {
+      const el = document.getElementById('control-wrapper');
+      if (el) el.remove();
+    }
+
     document.getElementById('fileInput').addEventListener('change', function (e) {
       const reader = new FileReader();
       reader.onload = function (f) {
@@ -182,6 +198,7 @@
             scaleY: 0.5,
             lockScalingFlip: true
           });
+          addControls(obj);
           canvas.add(obj);
           canvas.setActiveObject(obj);
         });
@@ -189,27 +206,20 @@
       reader.readAsText(e.target.files[0]);
     });
 
-    // Event-Listener
-    document.getElementById('gridToggle').onclick = toggleGrid;
-    document.getElementById('addTextBtn').onclick = addText;
-    document.getElementById('saveButton').onclick = saveAsSVG;
+    function saveAsSVG() {
+      const svg = canvas.toSVG({
+        suppressPreamble: false,
+        viewBox: { x: 0, y: 0, width: canvas.width, height: canvas.height }
+      }).replace(/(<svg[^>]*)(width="[^"]*"|height="[^"]*")/g, '$1'); // entfernt doppelte width/height
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
 
-    // Live-Änderung von Stil
-    document.getElementById('fontFamily').onchange = () => {
-      const obj = canvas.getActiveObject();
-      if (obj && obj.type === 'i-text') {
-        obj.set("fontFamily", document.getElementById("fontFamily").value);
-        canvas.requestRenderAll();
-      }
-    };
-
-    document.getElementById('fontColor').onchange = () => {
-      const obj = canvas.getActiveObject();
-      if (obj && obj.type === 'i-text') {
-        obj.set("fill", document.getElementById("fontColor").value);
-        canvas.requestRenderAll();
-      }
-    };
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'konfiguration.svg';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   </script>
 </body>
 </html>
