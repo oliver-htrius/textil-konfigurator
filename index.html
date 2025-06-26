@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -6,53 +5,52 @@
   <title>Textil-Konfigurator</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
   <style>
-  html, body {
-    margin: 0;
-    padding: 20px;
-    background: transparent !important;
-    font-family: sans-serif;
-    text-align: center;
-    color: white;
-  }
+    html, body {
+      margin: 0;
+      padding: 20px;
+      background: transparent;
+      font-family: sans-serif;
+      text-align: center;
+      color: white;
+    }
 
-  h2 {
-    margin-bottom: 10px;
-  }
+    .controls, .object-controls {
+      margin: 10px 0;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
 
-  .controls {
-    margin-bottom: 10px;
-  }
+    .canvas-wrapper {
+      display: flex;
+      justify-content: center;
+      position: relative;
+    }
 
-  .object-controls {
-    display: flex;
-    gap: 5px;
-    justify-content: center;
-    margin-top: 5px;
-  }
+    canvas {
+      border: 1px dashed #ccc;
+      background-color: transparent;
+    }
 
-  .object-controls button {
-    font-size: 14px;
-    padding: 2px 6px;
-  }
-
-  .canvas-wrapper {
-    display: flex;
-    justify-content: center;
-  }
-
-  canvas {
-    border: 1px dashed #ccc;
-    background-color: transparent !important;
-  }
-</style>
+    .grid-line {
+      stroke: rgba(255, 255, 255, 0.2);
+      stroke-width: 0.5;
+      selectable: false;
+      evented: false;
+    }
+  </style>
 </head>
 <body>
   <h2>Textil-Konfigurator</h2>
+
   <div class="controls">
     <input type="file" id="fileInput" accept=".svg" />
-    <button onclick="addText()">Text</button>
+    <button onclick="addText()">Text hinzufügen</button>
     <button onclick="saveAsSVG()">SVG speichern</button>
-    <br>
+    <label>
+      Raster:
+      <input type="checkbox" id="toggleGrid" onchange="toggleGrid()" />
+    </label>
     <label for="fontFamily">Schriftart:</label>
     <select id="fontFamily" onchange="updateTextFont()">
       <option value="Arial">Arial</option>
@@ -61,26 +59,16 @@
       <option value="Courier New">Courier New</option>
     </select>
     <label for="fontColor">Farbe:</label>
-    <input type="color" id="fontColor" value="#ffffff" onchange="updateTextColor()">
+    <input type="color" id="fontColor" value="#ffffff" onchange="updateTextColor()" />
   </div>
 
   <div class="canvas-wrapper">
     <canvas id="canvas" width="336" height="560"></canvas>
   </div>
-<div class="form-fields">
-  <label for="userEmail">Deine E-Mail:</label>
-  <input type="email" id="userEmail" placeholder="max@firma.de" required />
-
-  <label for="companyName">Unternehmen:</label>
-  <input type="text" id="companyName" placeholder="Firmenname" required />
-
-  <button onclick="sendSVG()">SVG speichern & senden</button>
-</div>
 
   <script>
-    const canvas = new fabric.Canvas('canvas', {
-      preserveObjectStacking: true
-    });
+    const canvas = new fabric.Canvas('canvas', { preserveObjectStacking: true });
+    let gridLines = [];
 
     function addText() {
       const text = new fabric.IText('Text', {
@@ -122,7 +110,7 @@
     function addControls(obj) {
       obj.controls = fabric.Object.prototype.controls;
 
-      obj.on('selected', function() {
+      obj.on('selected', function () {
         removeAllControlElements();
 
         const wrapper = document.createElement('div');
@@ -181,30 +169,64 @@
       reader.readAsText(e.target.files[0]);
     });
 
-    function sendSVG() {
-    const email = document.getElementById('userEmail').value;
-    const company = document.getElementById('companyName').value;
-
-    if (!email || !company) {
-      alert("Bitte E-Mail und Unternehmen angeben.");
-      return;
+    function saveAsSVG() {
+      // Temporär Raster entfernen
+      gridLines.forEach(line => canvas.remove(line));
+      const svgData = canvas.toSVG().replace('<svg ', '<svg width="120mm" height="200mm" ');
+      const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "konfiguration.svg";
+      link.click();
+      // Raster ggf. wieder einblenden
+      if (document.getElementById('toggleGrid').checked) drawGrid();
     }
 
-    const svg = canvas.toSVG().replace('<svg ', '<svg width="120mm" height="200mm" ');
-    const base64svg = btoa(unescape(encodeURIComponent(svg)));
+    function toggleGrid() {
+      if (document.getElementById('toggleGrid').checked) {
+        drawGrid();
+      } else {
+        clearGrid();
+      }
+    }
 
-      fetch('https://www.htrius.com/_functions/sendSVGEmail', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      svgBase64: base64svg,
-      userEmail: email,
-      companyName: company
-    })
-  })
-    .then(res => res.ok ? alert("Erfolgreich gesendet!") : alert("Fehler beim Senden."))
-    .catch(err => console.error(err));
-  }
-</script>
+    function drawGrid() {
+      clearGrid();
+      const spacing = 20;
+      const width = canvas.getWidth();
+      const height = canvas.getHeight();
+
+      for (let x = spacing; x < width; x += spacing) {
+        const line = new fabric.Line([x, 0, x, height], {
+          stroke: '#ccc',
+          strokeWidth: 0.5,
+          selectable: false,
+          evented: false
+        });
+        canvas.add(line);
+        gridLines.push(line);
+      }
+
+      for (let y = spacing; y < height; y += spacing) {
+        const line = new fabric.Line([0, y, width, y], {
+          stroke: '#ccc',
+          strokeWidth: 0.5,
+          selectable: false,
+          evented: false
+        });
+        canvas.add(line);
+        gridLines.push(line);
+      }
+
+      canvas.sendToBack(...gridLines);
+      canvas.requestRenderAll();
+    }
+
+    function clearGrid() {
+      gridLines.forEach(line => canvas.remove(line));
+      gridLines = [];
+      canvas.requestRenderAll();
+    }
+  </script>
 </body>
 </html>
