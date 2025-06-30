@@ -113,7 +113,7 @@
   <div class="controls">
     <input type="file" id="fileInput" accept=".svg" />
     <button onclick="toggleGrid()">Raster ein/aus</button>
-    <button onclick="addText()">Text hinzufügen</button>
+    <button onclick="addText()">+ Text</button>
     <label for="fontFamily">Schriftart:</label>
     <select id="fontFamily" onchange="updateTextFont()">
       <option value="Arial">Arial</option>
@@ -133,12 +133,17 @@
   <button class="save-button" onclick="saveAsSVG()">Konfiguration speichern</button>
 
   <script>
-    const canvas = new fabric.Canvas('canvas', {
-      preserveObjectStacking: true
-    });
-
+    const canvas = new fabric.Canvas('canvas', { preserveObjectStacking: true });
     let gridVisible = false;
     const gridGroup = [];
+    const history = [];
+    let isUndoing = false;
+
+    canvas.on('object:added', () => {
+      if (!isUndoing) {
+        history.push(JSON.stringify(canvas));
+      }
+    });
 
     function toggleGrid() {
       if (gridVisible) {
@@ -224,7 +229,7 @@
 
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = '🗑️';
-        deleteBtn.onclick = () => { canvas.remove(obj); removeAllControlElements(); };
+        deleteBtn.onclick = () => { canvas.remove(obj); removeAllControlElements(); canvas.requestRenderAll(); };
 
         wrapper.append(rotateLeftBtn, rotateRightBtn, scaleUpBtn, scaleDownBtn, deleteBtn);
         document.body.appendChild(wrapper);
@@ -253,16 +258,11 @@
     });
 
     function saveAsSVG() {
-      const clipRect = new fabric.Rect({
-        left: 0, top: 0, width: canvas.width, height: canvas.height, absolutePositioned: true
-      });
-
+      const clipRect = new fabric.Rect({ left: 0, top: 0, width: canvas.width, height: canvas.height, absolutePositioned: true });
       canvas.clipPath = clipRect;
 
-      const svg = canvas.toSVG({
-        suppressPreamble: false,
-        viewBox: { x: 0, y: 0, width: canvas.width, height: canvas.height }
-      }).replace(/(<svg[^>]*)(width="[^"]*"|height="[^"]*")/g, '$1')
+      const svg = canvas.toSVG({ suppressPreamble: false, viewBox: { x: 0, y: 0, width: canvas.width, height: canvas.height } })
+        .replace(/(<svg[^>]*)(width="[^"]*"|height="[^"]*")/g, '$1')
         .replace('<svg ', '<svg width="120mm" height="200mm" ');
 
       canvas.clipPath = null;
@@ -275,6 +275,25 @@
       link.click();
       document.body.removeChild(link);
     }
+
+    document.addEventListener('keydown', function(e) {
+      const obj = canvas.getActiveObject();
+      if (!obj) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        canvas.remove(obj);
+        removeAllControlElements();
+        canvas.requestRenderAll();
+      } else if (e.ctrlKey && e.key === 'z') {
+        if (history.length > 0) {
+          isUndoing = true;
+          const last = history.pop();
+          canvas.loadFromJSON(last, () => {
+            canvas.renderAll();
+            isUndoing = false;
+          });
+        }
+      }
+    });
   </script>
 </body>
 </html>
