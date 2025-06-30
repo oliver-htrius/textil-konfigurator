@@ -386,3 +386,30 @@ document.addEventListener('click', (e) => {
 });
 </script>
 </head>
+<body>
+  <h2>Textil-Konfigurator</h2>
+
+  <div class="controls">
+    <input type="file" id="fileInput" accept=".svg" />
+    <button onclick="toggleGrid()">Raster ein/aus</button>
+    <button onclick="addText()">+ Text</button>
+    <label for="fontFamily">Schriftart:</label>
+    <select id="fontFamily" onchange="updateTextFont()">
+      <option value="Arial">Arial</option>
+      <option value="Verdana">Verdana</option>
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Courier New">Courier New</option>
+      <option value="ConthraxSB">ConthraxSB</option>
+    </select>
+    <label for="fontColor">Farbe:</label>
+    <input type="color" id="fontColor" value="#ffffff">
+  </div>
+
+  <div class="canvas-wrapper">
+    <canvas id="canvas" width="336" height="560"></canvas>
+    <div id="angle-indicator"></div>
+  </div>
+
+  <button class="save-button" onclick="saveAsSVG()">Konfiguration speichern</button>
+</body>
+</html>
