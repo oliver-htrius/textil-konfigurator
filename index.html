@@ -28,6 +28,20 @@
       display: flex;
       justify-content: center;
       margin-bottom: 10px;
+      position: relative;
+    }
+
+    #angle-indicator {
+      position: absolute;
+      top: 5px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: ConthraxSB, sans-serif;
+      display: none;
     }
 
     canvas {
@@ -127,6 +141,7 @@
   </div>
 
   <div class="canvas-wrapper">
+    <div id="angle-indicator">0°</div>
     <canvas id="canvas" width="336" height="560"></canvas>
   </div>
 
@@ -138,12 +153,7 @@
     const gridGroup = [];
     const history = [];
     let isUndoing = false;
-
-    canvas.on('object:added', () => {
-      if (!isUndoing) {
-        history.push(JSON.stringify(canvas));
-      }
-    });
+    const angleIndicator = document.getElementById('angle-indicator');
 
     function toggleGrid() {
       if (gridVisible) {
@@ -175,10 +185,14 @@
         left: 100, top: 100,
         fontFamily: document.getElementById('fontFamily').value,
         fill: document.getElementById('fontColor').value,
-        fontSize: 24, editable: true,
-        borderColor: 'gray', cornerColor: 'white', cornerSize: 8,
-        transparentCorners: false, hasRotatingPoint: true,
-        rotatingPointOffset: 20, lockScalingFlip: true
+        fontSize: 24,
+        borderColor: 'gray',
+        cornerColor: 'white',
+        cornerSize: 8,
+        transparentCorners: false,
+        hasRotatingPoint: true,
+        rotatingPointOffset: 20,
+        lockScalingFlip: true
       });
       addControls(text);
       canvas.add(text);
@@ -243,6 +257,46 @@
       if (el) el.remove();
     }
 
+    canvas.on('object:added', () => {
+      if (!isUndoing) history.push(JSON.stringify(canvas));
+    });
+
+    canvas.on('object:rotating', function(e) {
+      const angle = Math.round(e.target.angle);
+      angleIndicator.style.display = 'block';
+      angleIndicator.innerText = angle + '°';
+      if ([0, 90, 180, 270, 360].includes(angle % 360)) {
+        e.target.angle = angle;
+      }
+    });
+
+    canvas.on('mouse:up', function() {
+      angleIndicator.style.display = 'none';
+    });
+
+    document.addEventListener('keydown', function(e) {
+      const obj = canvas.getActiveObject();
+      if (!obj) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        canvas.remove(obj);
+        removeAllControlElements();
+        canvas.requestRenderAll();
+      } else if (e.ctrlKey && e.key === 'z') {
+        if (history.length > 0) {
+          isUndoing = true;
+          const last = history.pop();
+          canvas.loadFromJSON(last, () => {
+            canvas.getObjects().forEach(o => {
+              addControls(o);
+              o.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+            });
+            canvas.renderAll();
+            isUndoing = false;
+          });
+        }
+      }
+    });
+
     document.getElementById('fileInput').addEventListener('change', function (e) {
       const reader = new FileReader();
       reader.onload = function (f) {
@@ -258,11 +312,16 @@
     });
 
     function saveAsSVG() {
-      const clipRect = new fabric.Rect({ left: 0, top: 0, width: canvas.width, height: canvas.height, absolutePositioned: true });
+      const clipRect = new fabric.Rect({
+        left: 0, top: 0, width: canvas.width, height: canvas.height, absolutePositioned: true
+      });
+
       canvas.clipPath = clipRect;
 
-      const svg = canvas.toSVG({ suppressPreamble: false, viewBox: { x: 0, y: 0, width: canvas.width, height: canvas.height } })
-        .replace(/(<svg[^>]*)(width="[^"]*"|height="[^"]*")/g, '$1')
+      const svg = canvas.toSVG({
+        suppressPreamble: false,
+        viewBox: { x: 0, y: 0, width: canvas.width, height: canvas.height }
+      }).replace(/(<svg[^>]*)(width="[^"]*"|height="[^"]*")/g, '$1')
         .replace('<svg ', '<svg width="120mm" height="200mm" ');
 
       canvas.clipPath = null;
@@ -275,25 +334,6 @@
       link.click();
       document.body.removeChild(link);
     }
-
-    document.addEventListener('keydown', function(e) {
-      const obj = canvas.getActiveObject();
-      if (!obj) return;
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        canvas.remove(obj);
-        removeAllControlElements();
-        canvas.requestRenderAll();
-      } else if (e.ctrlKey && e.key === 'z') {
-        if (history.length > 0) {
-          isUndoing = true;
-          const last = history.pop();
-          canvas.loadFromJSON(last, () => {
-            canvas.renderAll();
-            isUndoing = false;
-          });
-        }
-      }
-    });
   </script>
 </body>
 </html>
