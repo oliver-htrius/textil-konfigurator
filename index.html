@@ -41,10 +41,6 @@
     .save-button:hover {
       background-color: #efff66; transform: scale(1.05);
     }
-    #logoColorPickerContainer {
-      position: absolute; background: white; color: black; padding: 10px; border-radius: 8px;
-      display: none; box-shadow: 0 0 10px rgba(0,0,0,0.3); z-index: 999;
-    }
   </style>
 </head>
 <body>
@@ -69,22 +65,19 @@
 </div>
 <div class="object-controls" id="control-wrapper"></div>
 <button class="save-button" onclick="saveAsSVG()">Konfiguration speichern</button>
-<div id="logoColorPickerContainer">
-  <label>Logo-Farbe:</label>
-  <input type="color" id="logoColorPicker">
-</div>
 <script>
 const canvas = new fabric.Canvas('canvas', { preserveObjectStacking: true });
 let undoStack = [], redoStack = [], gridVisible = false, gridGroup = [];
 
 function pushState() {
-  undoStack.push(JSON.stringify(canvas));
+  const json = canvas.toDatalessJSON(['logoSVG']);
+  undoStack.push(JSON.stringify(json));
   redoStack = [];
 }
 function undo() {
   if (undoStack.length > 0) {
-    redoStack.push(JSON.stringify(canvas));
-    canvas.loadFromJSON(undoStack.pop(), () => {
+    redoStack.push(JSON.stringify(canvas.toDatalessJSON(['logoSVG'])));
+    canvas.loadFromJSON(JSON.parse(undoStack.pop()), () => {
       canvas.getObjects().forEach(addControls);
       canvas.renderAll();
     });
@@ -92,8 +85,8 @@ function undo() {
 }
 function redo() {
   if (redoStack.length > 0) {
-    undoStack.push(JSON.stringify(canvas));
-    canvas.loadFromJSON(redoStack.pop(), () => {
+    undoStack.push(JSON.stringify(canvas.toDatalessJSON(['logoSVG'])));
+    canvas.loadFromJSON(JSON.parse(redoStack.pop()), () => {
       canvas.getObjects().forEach(addControls);
       canvas.renderAll();
     });
@@ -175,24 +168,16 @@ function addControls(obj) {
     wrapper.append(rotateLeftBtn, rotateRightBtn, scaleUpBtn, scaleDownBtn, deleteBtn);
     if (obj.logoSVG) {
       const colorBtn = document.createElement('button');
-      colorBtn.textContent = '🎨';
-      colorBtn.onclick = () => {
-        const picker = document.getElementById('logoColorPickerContainer');
-        const canvasRect = canvas.upperCanvasEl.getBoundingClientRect();
-        const left = canvasRect.left + obj.left * canvas.getZoom();
-        const top = canvasRect.top + obj.top * canvas.getZoom();
-        picker.style.left = `${left}px`;
-        picker.style.top = `${top}px`;
-        picker.style.display = 'block';
-        const input = document.getElementById('logoColorPicker');
-        input.onchange = () => {
-          obj.getObjects().forEach(path => path.set({ fill: input.value }));
-          canvas.requestRenderAll();
-          picker.style.display = 'none';
-          pushState();
-        };
+      colorBtn.innerHTML = '🎨 Farbe ändern';
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.style.marginLeft = '4px';
+      colorInput.oninput = () => {
+        obj.getObjects().forEach(path => path.set({ fill: colorInput.value }));
+        canvas.requestRenderAll();
+        pushState();
       };
-      wrapper.append(colorBtn);
+      wrapper.append(colorBtn, colorInput);
     }
   });
   obj.on('deselected', () => document.getElementById('control-wrapper').innerHTML = '');
@@ -203,20 +188,6 @@ function addControls(obj) {
     });
   });
 }
-canvas.on('object:moving', function(e) {
-  const obj = e.target;
-  const centerX = canvas.getWidth() / 2;
-  const centerY = canvas.getHeight() / 2;
-  const threshold = 5;
-  const objCenterX = obj.left + obj.getScaledWidth() / 2;
-  const objCenterY = obj.top + obj.getScaledHeight() / 2;
-  if (Math.abs(objCenterX - centerX) < threshold) {
-    obj.left = centerX - obj.getScaledWidth() / 2;
-  }
-  if (Math.abs(objCenterY - centerY) < threshold) {
-    obj.top = centerY - obj.getScaledHeight() / 2;
-  }
-});
 document.getElementById('fileInput').addEventListener('change', function (e) {
   const reader = new FileReader();
   reader.onload = function (f) {
