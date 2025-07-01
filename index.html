@@ -223,6 +223,19 @@ window.addEventListener('drop', e => {
     reader.readAsText(file);
   }
 });
+canvas.on('object:modified', () => pushState());
+canvas.on('object:added', () => pushState());
+canvas.on('object:removed', () => pushState());
+canvas.on('mouse:up', () => {
+  const obj = canvas.getActiveObject();
+  if (obj && obj.__modified) {
+    pushState();
+    obj.__modified = false;
+  }
+});
+canvas.on('object:scaling', e => { if (e.target) e.target.__modified = true; });
+canvas.on('object:moving', e => { if (e.target) e.target.__modified = true; });
+canvas.on('object:rotating', e => { if (e.target) e.target.__modified = true; });
 function saveAsSVG() {
   const clipRect = new fabric.Rect({ left: 0, top: 0, width: canvas.width, height: canvas.height, absolutePositioned: true });
   canvas.clipPath = clipRect;
@@ -243,8 +256,10 @@ window.addEventListener('keydown', e => {
     const obj = canvas.getActiveObject();
     if (obj) canvas.remove(obj), pushState();
   } else if (e.ctrlKey && e.key === 'z') {
+    e.preventDefault();
     undo();
   } else if (e.ctrlKey && e.key === 'y') {
+    e.preventDefault();
     redo();
   }
 });
