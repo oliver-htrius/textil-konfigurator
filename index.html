@@ -45,13 +45,16 @@
       position: absolute; background: white; color: black; padding: 10px; border-radius: 8px;
       display: none; box-shadow: 0 0 10px rgba(0,0,0,0.3); z-index: 999;
     }
+    #rotationIndicator {
+      position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white;
+      padding: 4px 8px; border-radius: 6px; font-size: 12px; font-family: sans-serif; display: none;
+    }
   </style>
 </head>
 <body>
 <h2>Textil-Konfigurator</h2>
 <div class="controls">
   <input type="file" id="fileInput" accept=".svg" />
-  <button onclick="toggleGrid()">Raster ein/aus</button>
   <button onclick="addText()">Text hinzufügen</button>
   <label for="fontFamily">Schriftart:</label>
   <select id="fontFamily" onchange="updateTextFont()">
@@ -64,111 +67,132 @@
   <label for="fontColor">Farbe:</label>
   <input type="color" id="fontColor" value="#ffffff">
 </div>
-<div class="canvas-wrapper"><canvas id="canvas" width="336" height="560"></canvas></div>
+<div class="canvas-wrapper">
+  <canvas id="canvas" width="336" height="560"></canvas>
+</div>
 <button class="save-button" onclick="saveAsSVG()">Konfiguration speichern</button>
+<div id="rotationIndicator">0°</div>
 <div id="logoColorPickerContainer">
   <label>Logo-Farbe:</label>
   <input type="color" id="logoColorPicker">
 </div>
 <script>
 const canvas = new fabric.Canvas('canvas', { preserveObjectStacking: true });
-let gridVisible = false;
-const gridGroup = [], undoStack = [];
-function toggleGrid() {
-  if (gridVisible) gridGroup.forEach(line => canvas.remove(line)), gridGroup.length = 0;
-  else {
-    const spacing = 28;
-    for (let i = spacing; i < canvas.width; i += spacing)
-      gridGroup.push(new fabric.Line([i, 0, i, canvas.height], { stroke: '#aaa', selectable: false, evented: false, excludeFromExport: true }));
-    for (let i = spacing; i < canvas.height; i += spacing)
-      gridGroup.push(new fabric.Line([0, i, canvas.width, i], { stroke: '#aaa', selectable: false, evented: false, excludeFromExport: true }));
-    gridGroup.forEach(line => canvas.add(line));
-    canvas.sendToBack(...gridGroup);
-  }
-  gridVisible = !gridVisible;
-  canvas.requestRenderAll();
-}
+let undoStack = [], redoStack = [];
+
 function pushState() {
   undoStack.push(JSON.stringify(canvas));
-  if (undoStack.length > 20) undoStack.shift();
+  redoStack = [];
+  if (undoStack.length > 50) undoStack.shift();
 }
+
 function undo() {
   if (undoStack.length > 0) {
-    canvas.loadFromJSON(undoStack.pop(), () => canvas.renderAll());
+    redoStack.push(JSON.stringify(canvas));
+    canvas.loadFromJSON(undoStack.pop(), () => {
+      canvas.getObjects().forEach(addControls);
+      canvas.renderAll();
+    });
   }
 }
+
+function redo() {
+  if (redoStack.length > 0) {
+    undoStack.push(JSON.stringify(canvas));
+    canvas.loadFromJSON(redoStack.pop(), () => {
+      canvas.getObjects().forEach(addControls);
+      canvas.renderAll();
+    });
+  }
+}
+
 function addText() {
   const text = new fabric.IText('Text', {
-    left: 100, top: 100,
-    fontFamily: document.getElementById('fontFamily').value,
+    left: 100, top: 100, fontFamily: document.getElementById('fontFamily').value,
     fill: document.getElementById('fontColor').value,
     fontSize: 24, editable: true,
     borderColor: 'gray', cornerColor: 'white', cornerSize: 8,
-    transparentCorners: false, hasRotatingPoint: true, rotatingPointOffset: 20, lockScalingFlip: true
+    transparentCorners: false, hasRotatingPoint: true,
+    rotatingPointOffset: 20, lockScalingFlip: true
   });
   addControls(text);
   canvas.add(text);
   canvas.setActiveObject(text);
   pushState();
 }
-document.getElementById('fontColor').addEventListener('change', updateTextColor);
-document.getElementById('fontColor').addEventListener('blur', updateTextColor);
-document.getElementById('fontColor').addEventListener('keydown', e => { if (e.key === 'Enter') updateTextColor(); });
+
 function updateTextFont() {
   const obj = canvas.getActiveObject();
-  if (obj?.type === 'i-text') obj.set("fontFamily", document.getElementById("fontFamily").value), canvas.requestRenderAll(), pushState();
+  if (obj?.type === 'i-text') {
+    obj.set("fontFamily", document.getElementById("fontFamily").value);
+    canvas.requestRenderAll();
+    pushState();
+  }
 }
+
+document.getElementById('fontColor').addEventListener('input', updateTextColor);
+document.getElementById('fontColor').addEventListener('blur', updateTextColor);
+document.getElementById('fontColor').addEventListener('keydown', e => {
+  if (e.key === 'Enter') updateTextColor();
+});
+
 function updateTextColor() {
   const obj = canvas.getActiveObject();
-  if (obj?.type === 'i-text') obj.set("fill", document.getElementById("fontColor").value), canvas.requestRenderAll(), pushState();
+  if (obj?.type === 'i-text') {
+    obj.set("fill", document.getElementById("fontColor").value);
+    canvas.requestRenderAll();
+    pushState();
+  }
 }
+
 function addControls(obj) {
   obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
-  obj.on('selected', () => {
-    removeAllControlElements();
-    const wrapper = document.createElement('div');
-    wrapper.className = 'object-controls'; wrapper.id = 'control-wrapper';
-    [
-      ['⟲', () => rotateSnap(obj, -15)],
-      ['⟳', () => rotateSnap(obj, 15)],
-      ['⤢', () => obj.scale(obj.scaleX * 1.1), canvas.requestRenderAll],
-      ['⤡', () => obj.scale(obj.scaleX * 0.9), canvas.requestRenderAll],
-      ['🗑️', () => { canvas.remove(obj); removeAllControlElements(); pushState(); }]
-    ].forEach(([txt, fn]) => {
-      const btn = document.createElement('button');
-      btn.textContent = txt;
-      btn.onclick = () => { fn(); canvas.requestRenderAll(); pushState(); };
-      wrapper.appendChild(btn);
-    });
-    if (obj.logoSVG) {
-      const colorBtn = document.createElement('button');
-      colorBtn.textContent = '🎨';
-      colorBtn.onclick = () => showLogoColorPicker(obj);
-      wrapper.appendChild(colorBtn);
-    }
-    document.body.appendChild(wrapper);
-  });
-  obj.on('deselected', removeAllControlElements);
+
   obj.on('rotating', () => {
-    const angles = [90, 180, 270, 360];
-    angles.forEach(snap => {
-      if (Math.abs(obj.angle - snap) < 5) obj.rotate(snap);
+    const rotationIndicator = document.getElementById('rotationIndicator');
+    rotationIndicator.style.display = 'block';
+    rotationIndicator.textContent = `${Math.round(obj.angle)}°`;
+
+    const snapAngles = [0, 90, 180, 270, 360];
+    snapAngles.forEach(angle => {
+      if (Math.abs(obj.angle - angle) < 5) obj.rotate(angle);
     });
   });
+
+  obj.on('rotated', () => {
+    document.getElementById('rotationIndicator').style.display = 'none';
+  });
+
+  obj.on('selected', () => {
+    if (obj.logoSVG) {
+      const picker = document.getElementById('logoColorPickerContainer');
+      const canvasRect = canvas.upperCanvasEl.getBoundingClientRect();
+      const left = canvasRect.left + obj.left * canvas.getZoom();
+      const top = canvasRect.top + obj.top * canvas.getZoom();
+      picker.style.left = `${left}px`;
+      picker.style.top = `${top}px`;
+      picker.style.display = 'block';
+      const input = document.getElementById('logoColorPicker');
+      input.onchange = () => {
+        obj.getObjects().forEach(path => path.set({ fill: input.value }));
+        canvas.requestRenderAll();
+        picker.style.display = 'none';
+        pushState();
+      };
+    }
+  });
+
+  obj.on('deselected', () => {
+    document.getElementById('logoColorPickerContainer').style.display = 'none';
+  });
 }
-function rotateSnap(obj, step) {
-  obj.rotate((obj.angle + step + 360) % 360);
-}
-function removeAllControlElements() {
-  const el = document.getElementById('control-wrapper');
-  if (el) el.remove();
-}
+
 document.getElementById('fileInput').addEventListener('change', function (e) {
   const reader = new FileReader();
   reader.onload = function (f) {
     fabric.loadSVGFromString(f.target.result, function (objects, options) {
       const obj = fabric.util.groupSVGElements(objects, options);
-      obj.set({ left: 100, top: 100, scaleX: 0.5, scaleY: 0.5, lockScalingFlip: true });
+      obj.set({ left: 100, top: 100, scaleX: 0.5, scaleY: 0.5 });
       obj.logoSVG = true;
       addControls(obj);
       canvas.add(obj);
@@ -178,27 +202,46 @@ document.getElementById('fileInput').addEventListener('change', function (e) {
   };
   reader.readAsText(e.target.files[0]);
 });
-function showLogoColorPicker(obj) {
-  const picker = document.getElementById('logoColorPickerContainer');
-  picker.style.display = 'block';
-  picker.style.left = `${window.innerWidth / 2 - 75}px`;
-  picker.style.top = `${window.innerHeight / 2 - 50}px`;
-  const input = document.getElementById('logoColorPicker');
-  input.onchange = () => {
-    obj.getObjects().forEach(path => path.set({ fill: input.value }));
-    canvas.requestRenderAll();
-    picker.style.display = 'none';
-    pushState();
-  };
-}
-window.addEventListener('keydown', e => {
-  if (e.key === 'Delete') {
-    const obj = canvas.getActiveObject();
-    if (obj) canvas.remove(obj), pushState();
-  } else if (e.ctrlKey && e.key === 'z') {
-    undo();
+
+// Drag-and-drop SVG Support
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0];
+    if (file.type === "image/svg+xml") {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        fabric.loadSVGFromString(evt.target.result, (objects, options) => {
+          const obj = fabric.util.groupSVGElements(objects, options);
+          obj.set({ left: 100, top: 100, scaleX: 0.5, scaleY: 0.5 });
+          obj.logoSVG = true;
+          addControls(obj);
+          canvas.add(obj);
+          canvas.setActiveObject(obj);
+          pushState();
+        });
+      };
+      reader.readAsText(file);
+    }
   }
 });
+
+canvas.on('object:moving', function(e) {
+  const obj = e.target;
+  const canvasCenter = {
+    x: canvas.getWidth() / 2,
+    y: canvas.getHeight() / 2
+  };
+  const threshold = 5;
+  if (Math.abs(obj.left + obj.width / 2 - canvasCenter.x) < threshold) {
+    obj.left = canvasCenter.x - obj.width / 2;
+  }
+  if (Math.abs(obj.top + obj.height / 2 - canvasCenter.y) < threshold) {
+    obj.top = canvasCenter.y - obj.height / 2;
+  }
+});
+
 function saveAsSVG() {
   const clipRect = new fabric.Rect({ left: 0, top: 0, width: canvas.width, height: canvas.height, absolutePositioned: true });
   canvas.clipPath = clipRect;
@@ -214,6 +257,17 @@ function saveAsSVG() {
   link.click();
   document.body.removeChild(link);
 }
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'Delete') {
+    const obj = canvas.getActiveObject();
+    if (obj) canvas.remove(obj), pushState();
+  } else if (e.ctrlKey && e.key === 'z') {
+    undo();
+  } else if (e.ctrlKey && e.key === 'y') {
+    redo();
+  }
+});
 </script>
 </body>
 </html>
